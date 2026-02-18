@@ -1,0 +1,633 @@
+/* USER CODE BEGIN Header */
+/**
+  ******************************************************************************
+  * @file           : main.c
+  * @brief          : Main program body
+  ******************************************************************************
+  * @attention
+  *
+  * Copyright (c) 2026 STMicroelectronics.
+  * All rights reserved.
+  *
+  * This software is licensed under terms that can be found in the LICENSE file
+  * in the root directory of this software component.
+  * If no LICENSE file comes with this software, it is provided AS-IS.
+  *
+  ******************************************************************************
+  */
+/* USER CODE END Header */
+/* Includes ------------------------------------------------------------------*/
+#include "main.h"
+#include "lsm6dso_reg.h"
+#include "iis2mdc_reg.h"
+#include <stdio.h>
+#include <string.h>
+#include <math.h>
+
+/* Peripheral handles */
+SPI_HandleTypeDef hspi1;
+SPI_HandleTypeDef hspi2;
+UART_HandleTypeDef huart1;
+TIM_HandleTypeDef htim2;
+TIM_HandleTypeDef htim3;
+
+/* Function prototypes */
+void SystemClock_Config(void);
+static void MPU_Config(void);
+static void MX_GPIO_Init(void);
+static void MX_SPI1_Init(void);
+static void MX_SPI2_Init(void);
+static void MX_USART1_UART_Init(void);
+static void MX_TIM2_Init(void);
+
+/* ===================== PLATFORM FUNCTIONS ===================== */
+stmdev_ctx_t lsm6dso_ctx;
+stmdev_ctx_t iis2mdc_ctx;
+// LSM6DSO SPI1, CS = PB4
+int32_t lsm6dso_write(void *handle, uint8_t reg,
+                      const uint8_t *bufp, uint16_t len)
+{
+    reg &= 0x7F;
+    HAL_GPIO_WritePin(GPIOB, GPIO_PIN_4, GPIO_PIN_RESET); // CS Low
+    HAL_SPI_Transmit(&hspi1, &reg, 1, 100);
+    HAL_SPI_Transmit(&hspi1, (uint8_t*)bufp, len, 100);
+    HAL_GPIO_WritePin(GPIOB, GPIO_PIN_4, GPIO_PIN_SET); // CS High
+    return 0;
+
+}
+
+int32_t lsm6dso_read(void *handle, uint8_t reg,
+                     uint8_t *bufp, uint16_t len)
+{
+	  reg |= 0x80;
+	  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_4, GPIO_PIN_RESET);
+	  HAL_SPI_Transmit(&hspi1, &reg, 1, 1000);
+	  HAL_SPI_Receive(&hspi1, bufp, len, 1000);
+	  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_4, GPIO_PIN_SET);
+return 0;
+}
+
+// IIS2MDC SPI2, CS = PB2
+int32_t mag_platform_write(void *handle, uint8_t reg,
+                           const uint8_t *bufp, uint16_t len)
+{
+    reg &= 0x7F;
+    HAL_GPIO_WritePin(GPIOB, GPIO_PIN_2, GPIO_PIN_RESET);
+    HAL_SPI_Transmit(&hspi2, &reg, 1, HAL_MAX_DELAY);
+    HAL_SPI_Transmit(&hspi2, (uint8_t *)bufp, len, HAL_MAX_DELAY);
+    HAL_GPIO_WritePin(GPIOB, GPIO_PIN_2, GPIO_PIN_SET);
+
+    return 0;
+}
+
+int32_t mag_platform_read(void *handle, uint8_t reg,
+                          uint8_t *bufp, uint16_t len)
+{
+    reg |= 0x80;
+    HAL_GPIO_WritePin(GPIOB, GPIO_PIN_2, GPIO_PIN_RESET);
+    HAL_SPI_Transmit(&hspi2, &reg, 1, HAL_MAX_DELAY);
+    HAL_SPI_Receive(&hspi2, bufp, len, HAL_MAX_DELAY);
+    HAL_GPIO_WritePin(GPIOB, GPIO_PIN_2, GPIO_PIN_SET);
+
+    return 0;
+}
+
+/* Conversion helper */
+float raw_accel_to_mss(int16_t raw)
+{
+    return (float)raw * 0.00059f; //conversion found in data sheet says 0.00061 but it overshoots...
+}
+
+float raw_gyro_to_degreespersecond(int16_t raw){
+	return raw * 0.00875f; //value from data sheet -- angular rate sensitivity type
+}
+
+/* ===================== MAIN ===================== */
+
+int main(void)
+{
+    MPU_Config();
+    HAL_Init();
+    SystemClock_Config();
+
+    MX_GPIO_Init();
+    MX_SPI1_Init();
+    MX_SPI2_Init();
+    MX_USART1_UART_Init();
+    MX_TIM2_Init();
+
+    // LSM6DSO initialize
+    lsm6dso_ctx.write_reg = lsm6dso_write;
+    lsm6dso_ctx.read_reg  = lsm6dso_read;
+    lsm6dso_ctx.handle    = &hspi1;
+
+    // IIS2MDC initialize
+    iis2mdc_ctx.write_reg = mag_platform_write;
+    iis2mdc_ctx.read_reg  = mag_platform_read;
+    iis2mdc_ctx.handle    = &hspi2;
+
+    /* -------- LSM6DSO INIT -------- */
+
+    lsm6dso_spi_mode_set(&lsm6dso_ctx,LSM6DSO_SPI_3_WIRE); //using the stm32 lsm6dso library and should use this to work with 3 wire mode
+    lsm6dso_auto_increment_set(&lsm6dso_ctx, 1);
+    lsm6dso_xl_data_rate_set(&lsm6dso_ctx, LSM6DSO_XL_ODR_833Hz );
+    lsm6dso_block_data_update_set(&lsm6dso_ctx, 1);
+    lsm6dso_gy_full_scale_set(&lsm6dso_ctx, LSM6DSO_250dps);
+    lsm6dso_gy_data_rate_set(&lsm6dso_ctx, LSM6DSO_GY_ODR_833Hz);
+
+
+    /* -----iis2mdc INIT ----- */
+    iis2mdc_data_rate_set(&iis2mdc_ctx, IIS2MDC_ODR_100Hz);
+    iis2mdc_block_data_update_set(&iis2mdc_ctx, 1);
+
+    //WHOAMI
+    uint8_t VALUE = 0;
+    lsm6dso_read(NULL, 0x0F, &VALUE, 1);
+
+    //testing to check if i can comm with the imu
+    char string[32];
+    sprintf(string, "LSM6DOWHO_AM_I = 0x%02X \r\n", VALUE);
+    HAL_UART_Transmit(&huart1, (uint8_t *)string, strlen(string), HAL_MAX_DELAY);
+
+
+    uint8_t whoami = 0;
+    iis2mdc_device_id_get(&iis2mdc_ctx, &whoami);
+
+    char msg[32];
+    sprintf(msg, "IIS2MDC WHO_AM_I = 0x%02X\r\n", whoami);
+    HAL_UART_Transmit(&huart1, (uint8_t*)msg, strlen(msg), HAL_MAX_DELAY);
+
+    /* Variables */
+    int16_t raw_accel[3];
+    float accel_mss[3];
+    char accel_data[64];
+
+    int16_t raw_gyro[3];
+   // volatile char gyro_data[64]; // used for printing the raw gyro data - redundant
+    float gyro_intermediate[3];
+    float G_X_roll= 0.0f;
+    float G_Y_pitch = 0.0f;
+    float G_Z_yaw= 0.0f;
+    char Gyro_accum[64];
+    char OFFSET[64];
+
+    int16_t raw_mag[3];
+    char mag_data[64];
+
+    float dt = 0.0f;
+
+//    HAL_TIM_PWM_Start(&htim2, TIM_CHANNEL_4);
+//    HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_1);
+//
+//    __HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_4, 255);
+//    __HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_1, 255);
+
+    HAL_GPIO_WritePin(GPIOA, GPIO_PIN_3, SET);
+    HAL_GPIO_WritePin(GPIOA, GPIO_PIN_15,SET);
+    HAL_GPIO_WritePin(GPIOA, GPIO_PIN_1, SET);
+    HAL_GPIO_WritePin(GPIOA, GPIO_PIN_2, SET);
+    HAL_GPIO_WritePin(GPIOC, GPIO_PIN_6, SET);
+    HAL_GPIO_WritePin(GPIOC, GPIO_PIN_7, SET);
+
+    //gyro bias reduction
+    lsm6dso_angular_rate_raw_get(&lsm6dso_ctx, raw_gyro);
+    gyro_intermediate[0]= raw_gyro_to_degreespersecond(raw_gyro[0]);
+    gyro_intermediate[1]= -raw_gyro_to_degreespersecond(raw_gyro[1]);
+    gyro_intermediate[2]= raw_gyro_to_degreespersecond(raw_gyro[2]);
+    float sumx = 0.0f, sumy = 0.0f, sumz = 0.0f;
+    char waiting[] = "Calibrating offset values";
+    HAL_UART_Transmit(&huart1, (uint8_t*) waiting, strlen(waiting) ,100);
+    int n = 1000; //number of calibration trials
+    for (int i = 0; i < n; i++){
+    	sumx += gyro_intermediate[0];
+    	sumy += gyro_intermediate[1];
+    	sumz += gyro_intermediate[2];
+    	HAL_Delay (3);
+    }
+
+    float offset_x = sumx/(n-1);
+    float offset_y = sumy/(n-1);
+    float offset_z = sumz/(n-1);
+	sprintf(OFFSET, "OFFSET X=%.5f Y=%.5f Z=%.5f \r\n",offset_x, offset_y, offset_z);
+	HAL_UART_Transmit(&huart1, (uint8_t *)OFFSET, strlen(OFFSET), HAL_MAX_DELAY);
+	HAL_Delay(2000);
+
+
+
+
+    uint32_t last_tick = HAL_GetTick();
+    /* -------- MAIN LOOP -------- */
+    while (1)
+    {
+    	//getting dt from integrating gyro
+    	uint32_t now = HAL_GetTick();
+    	float dt = (now - last_tick	) / 1000.0f;
+    	last_tick = now;
+
+    	//accelerometer
+        lsm6dso_acceleration_raw_get(&lsm6dso_ctx, raw_accel);
+
+        accel_mss[0] = raw_accel_to_mss(raw_accel[0]);
+        accel_mss[1] = raw_accel_to_mss(raw_accel[1]);
+        accel_mss[2] = raw_accel_to_mss(raw_accel[2]);
+
+        snprintf(accel_data, sizeof(accel_data), "Accel X=%.2f Y=%.2f Z=%.2f\r\n", accel_mss[1], -accel_mss[0], accel_mss[2]);
+        HAL_UART_Transmit(&huart1, (uint8_t *)accel_data, strlen(accel_data), HAL_MAX_DELAY);
+
+        //gyro
+        lsm6dso_angular_rate_raw_get(&lsm6dso_ctx, raw_gyro);
+
+        gyro_intermediate[0]= raw_gyro_to_degreespersecond(raw_gyro[0]) -offset_x ;
+        gyro_intermediate[1]= -raw_gyro_to_degreespersecond(raw_gyro[1]) - offset_y ;
+        gyro_intermediate[2]= raw_gyro_to_degreespersecond(raw_gyro[2]) - offset_z;
+//        snprintf(gyro_data, sizeof(gyro_data), "GYRO X=%.2f Y=%.2f Z=%.2f \r\n", gyro_intermediate[0], gyro_intermediate[1], gyro_intermediate[2]);
+//        HAL_UART_Transmit(&huart1, (uint8_t *)gyro_data, strlen(gyro_data), HAL_MAX_DELAY);
+        G_X_roll += (gyro_intermediate[0]) * dt;
+        G_Y_pitch += (gyro_intermediate[1] )* dt ;
+        G_Z_yaw += (gyro_intermediate[2]) * dt ;
+
+        sprintf(Gyro_accum, "GYRO roll=%.2f pitch=%.2f yaw=%.2f \r\n",G_X_roll, G_Y_pitch, G_Z_yaw);
+        HAL_UART_Transmit(&huart1, (uint8_t *)Gyro_accum, strlen(Gyro_accum), HAL_MAX_DELAY);
+
+
+       // loop for magnetometer data
+        iis2mdc_magnetic_raw_get(&iis2mdc_ctx, raw_mag);
+        sprintf(mag_data, "MAG DATA  X: %i Y: %i Z: %i \r\n", raw_mag[0], raw_mag[1], raw_mag[2]);
+        HAL_UART_Transmit(&huart1, (uint8_t*)mag_data, strlen(mag_data), HAL_MAX_DELAY);
+        HAL_Delay(10);
+    }
+}
+
+
+/**
+  * @brief System Clock Configuration
+  * @retval None
+  */
+void SystemClock_Config(void)
+{
+  RCC_OscInitTypeDef RCC_OscInitStruct = {0};
+  RCC_ClkInitTypeDef RCC_ClkInitStruct = {0};
+
+  /*AXI clock gating */
+  RCC->CKGAENR = 0xE003FFFF;
+
+  /** Supply configuration update enable
+  */
+  HAL_PWREx_ConfigSupply(PWR_LDO_SUPPLY);
+
+  /** Configure the main internal regulator output voltage
+  */
+  __HAL_PWR_VOLTAGESCALING_CONFIG(PWR_REGULATOR_VOLTAGE_SCALE3);
+
+  while(!__HAL_PWR_GET_FLAG(PWR_FLAG_VOSRDY)) {}
+
+  /** Initializes the RCC Oscillators according to the specified parameters
+  * in the RCC_OscInitTypeDef structure.
+  */
+  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSI;
+  RCC_OscInitStruct.HSIState = RCC_HSI_DIV1;
+  RCC_OscInitStruct.HSICalibrationValue = 64;
+  RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
+  RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSI;
+  RCC_OscInitStruct.PLL.PLLM = 4;
+  RCC_OscInitStruct.PLL.PLLN = 8;
+  RCC_OscInitStruct.PLL.PLLP = 2;
+  RCC_OscInitStruct.PLL.PLLQ = 2;
+  RCC_OscInitStruct.PLL.PLLR = 2;
+  RCC_OscInitStruct.PLL.PLLRGE = RCC_PLL1VCIRANGE_3;
+  RCC_OscInitStruct.PLL.PLLVCOSEL = RCC_PLL1VCOWIDE;
+  RCC_OscInitStruct.PLL.PLLFRACN = 0;
+  if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK)
+  {
+    Error_Handler();
+  }
+
+  /** Initializes the CPU, AHB and APB buses clocks
+  */
+  RCC_ClkInitStruct.ClockType = RCC_CLOCKTYPE_HCLK|RCC_CLOCKTYPE_SYSCLK
+                              |RCC_CLOCKTYPE_PCLK1|RCC_CLOCKTYPE_PCLK2
+                              |RCC_CLOCKTYPE_D3PCLK1|RCC_CLOCKTYPE_D1PCLK1;
+  RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_HSI;
+  RCC_ClkInitStruct.SYSCLKDivider = RCC_SYSCLK_DIV1;
+  RCC_ClkInitStruct.AHBCLKDivider = RCC_HCLK_DIV1;
+  RCC_ClkInitStruct.APB3CLKDivider = RCC_APB3_DIV1;
+  RCC_ClkInitStruct.APB1CLKDivider = RCC_APB1_DIV1;
+  RCC_ClkInitStruct.APB2CLKDivider = RCC_APB2_DIV1;
+  RCC_ClkInitStruct.APB4CLKDivider = RCC_APB4_DIV1;
+
+  if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_2) != HAL_OK)
+  {
+    Error_Handler();
+  }
+}
+
+/**
+  * @brief SPI1 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_SPI1_Init(void)
+{
+
+  /* USER CODE BEGIN SPI1_Init 0 */
+
+  /* USER CODE END SPI1_Init 0 */
+
+  /* USER CODE BEGIN SPI1_Init 1 */
+
+  /* USER CODE END SPI1_Init 1 */
+  /* SPI1 parameter configuration*/
+  hspi1.Instance = SPI1;
+  hspi1.Init.Mode = SPI_MODE_MASTER;
+  hspi1.Init.Direction = SPI_DIRECTION_1LINE;
+  hspi1.Init.DataSize = SPI_DATASIZE_8BIT;
+  hspi1.Init.CLKPolarity = SPI_POLARITY_LOW;
+  hspi1.Init.CLKPhase = SPI_PHASE_1EDGE;
+  hspi1.Init.NSS = SPI_NSS_SOFT;
+  hspi1.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_32;
+  hspi1.Init.FirstBit = SPI_FIRSTBIT_MSB;
+  hspi1.Init.TIMode = SPI_TIMODE_DISABLE;
+  hspi1.Init.CRCCalculation = SPI_CRCCALCULATION_DISABLE;
+  hspi1.Init.CRCPolynomial = 0x0;
+  hspi1.Init.NSSPMode = SPI_NSS_PULSE_DISABLE;
+  hspi1.Init.NSSPolarity = SPI_NSS_POLARITY_LOW;
+  hspi1.Init.FifoThreshold = SPI_FIFO_THRESHOLD_01DATA;
+  hspi1.Init.TxCRCInitializationPattern = SPI_CRC_INITIALIZATION_ALL_ZERO_PATTERN;
+  hspi1.Init.RxCRCInitializationPattern = SPI_CRC_INITIALIZATION_ALL_ZERO_PATTERN;
+  hspi1.Init.MasterSSIdleness = SPI_MASTER_SS_IDLENESS_00CYCLE;
+  hspi1.Init.MasterInterDataIdleness = SPI_MASTER_INTERDATA_IDLENESS_00CYCLE;
+  hspi1.Init.MasterReceiverAutoSusp = SPI_MASTER_RX_AUTOSUSP_DISABLE;
+  hspi1.Init.MasterKeepIOState = SPI_MASTER_KEEP_IO_STATE_DISABLE;
+  hspi1.Init.IOSwap = SPI_IO_SWAP_DISABLE;
+  if (HAL_SPI_Init(&hspi1) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN SPI1_Init 2 */
+
+  /* USER CODE END SPI1_Init 2 */
+
+}
+
+/**
+  * @brief SPI2 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_SPI2_Init(void)
+{
+
+  /* USER CODE BEGIN SPI2_Init 0 */
+
+  /* USER CODE END SPI2_Init 0 */
+
+  /* USER CODE BEGIN SPI2_Init 1 */
+
+  /* USER CODE END SPI2_Init 1 */
+  /* SPI2 parameter configuration*/
+  hspi2.Instance = SPI2;
+  hspi2.Init.Mode = SPI_MODE_MASTER;
+  hspi2.Init.Direction = SPI_DIRECTION_1LINE;
+  hspi2.Init.DataSize = SPI_DATASIZE_8BIT;
+  hspi2.Init.CLKPolarity = SPI_POLARITY_LOW;
+  hspi2.Init.CLKPhase = SPI_PHASE_1EDGE;
+  hspi2.Init.NSS = SPI_NSS_SOFT;
+  hspi2.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_128;
+  hspi2.Init.FirstBit = SPI_FIRSTBIT_MSB;
+  hspi2.Init.TIMode = SPI_TIMODE_DISABLE;
+  hspi2.Init.CRCCalculation = SPI_CRCCALCULATION_DISABLE;
+  hspi2.Init.CRCPolynomial = 0x0;
+  hspi2.Init.NSSPMode = SPI_NSS_PULSE_DISABLE;
+  hspi2.Init.NSSPolarity = SPI_NSS_POLARITY_LOW;
+  hspi2.Init.FifoThreshold = SPI_FIFO_THRESHOLD_01DATA;
+  hspi2.Init.TxCRCInitializationPattern = SPI_CRC_INITIALIZATION_ALL_ZERO_PATTERN;
+  hspi2.Init.RxCRCInitializationPattern = SPI_CRC_INITIALIZATION_ALL_ZERO_PATTERN;
+  hspi2.Init.MasterSSIdleness = SPI_MASTER_SS_IDLENESS_00CYCLE;
+  hspi2.Init.MasterInterDataIdleness = SPI_MASTER_INTERDATA_IDLENESS_00CYCLE;
+  hspi2.Init.MasterReceiverAutoSusp = SPI_MASTER_RX_AUTOSUSP_DISABLE;
+  hspi2.Init.MasterKeepIOState = SPI_MASTER_KEEP_IO_STATE_DISABLE;
+  hspi2.Init.IOSwap = SPI_IO_SWAP_DISABLE;
+  if (HAL_SPI_Init(&hspi2) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN SPI2_Init 2 */
+
+  /* USER CODE END SPI2_Init 2 */
+
+}
+
+/**
+  * @brief TIM2 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_TIM2_Init(void)
+{
+
+  /* USER CODE BEGIN TIM2_Init 0 */
+
+  /* USER CODE END TIM2_Init 0 */
+
+  TIM_ClockConfigTypeDef sClockSourceConfig = {0};
+  TIM_MasterConfigTypeDef sMasterConfig = {0};
+
+  /* USER CODE BEGIN TIM2_Init 1 */
+
+  /* USER CODE END TIM2_Init 1 */
+  htim2.Instance = TIM2;
+  htim2.Init.Prescaler = 0;
+  htim2.Init.CounterMode = TIM_COUNTERMODE_UP;
+  htim2.Init.Period = 255;
+  htim2.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
+  htim2.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_ENABLE;
+  if (HAL_TIM_Base_Init(&htim2) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sClockSourceConfig.ClockSource = TIM_CLOCKSOURCE_INTERNAL;
+  if (HAL_TIM_ConfigClockSource(&htim2, &sClockSourceConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
+  sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
+  if (HAL_TIMEx_MasterConfigSynchronization(&htim2, &sMasterConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN TIM2_Init 2 */
+
+  /* USER CODE END TIM2_Init 2 */
+
+}
+
+/**
+  * @brief USART1 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_USART1_UART_Init(void)
+{
+
+  /* USER CODE BEGIN USART1_Init 0 */
+
+  /* USER CODE END USART1_Init 0 */
+
+  /* USER CODE BEGIN USART1_Init 1 */
+
+  /* USER CODE END USART1_Init 1 */
+  huart1.Instance = USART1;
+  huart1.Init.BaudRate = 115200;
+  huart1.Init.WordLength = UART_WORDLENGTH_8B;
+  huart1.Init.StopBits = UART_STOPBITS_1;
+  huart1.Init.Parity = UART_PARITY_NONE;
+  huart1.Init.Mode = UART_MODE_TX_RX;
+  huart1.Init.HwFlowCtl = UART_HWCONTROL_NONE;
+  huart1.Init.OverSampling = UART_OVERSAMPLING_16;
+  huart1.Init.OneBitSampling = UART_ONE_BIT_SAMPLE_DISABLE;
+  huart1.Init.ClockPrescaler = UART_PRESCALER_DIV1;
+  huart1.AdvancedInit.AdvFeatureInit = UART_ADVFEATURE_NO_INIT;
+  if (HAL_UART_Init(&huart1) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  if (HAL_UARTEx_SetTxFifoThreshold(&huart1, UART_TXFIFO_THRESHOLD_1_8) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  if (HAL_UARTEx_SetRxFifoThreshold(&huart1, UART_RXFIFO_THRESHOLD_1_8) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  if (HAL_UARTEx_DisableFifoMode(&huart1) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN USART1_Init 2 */
+
+  /* USER CODE END USART1_Init 2 */
+
+}
+
+/**
+  * @brief GPIO Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_GPIO_Init(void)
+{
+  GPIO_InitTypeDef GPIO_InitStruct = {0};
+  /* USER CODE BEGIN MX_GPIO_Init_1 */
+
+  /* USER CODE END MX_GPIO_Init_1 */
+
+  /* GPIO Ports Clock Enable */
+  __HAL_RCC_GPIOC_CLK_ENABLE();
+  __HAL_RCC_GPIOA_CLK_ENABLE();
+  __HAL_RCC_GPIOB_CLK_ENABLE();
+
+  /*Configure GPIO pin Output Level */
+  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_1|GPIO_PIN_2|GPIO_PIN_3|GPIO_PIN_15, GPIO_PIN_RESET);
+
+  /*Configure GPIO pin Output Level */
+  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_2, GPIO_PIN_RESET);
+
+  /*Configure GPIO pin Output Level */
+  HAL_GPIO_WritePin(GPIOC, GPIO_PIN_6|GPIO_PIN_7, GPIO_PIN_RESET);
+
+  /*Configure GPIO pin Output Level */
+  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_4, GPIO_PIN_SET);
+
+  /*Configure GPIO pins : PA1 PA2 PA3 PA15 */
+  GPIO_InitStruct.Pin = GPIO_PIN_1|GPIO_PIN_2|GPIO_PIN_3|GPIO_PIN_15;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_PULLDOWN;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+
+  /*Configure GPIO pins : PB2 PB4 */
+  GPIO_InitStruct.Pin = GPIO_PIN_2|GPIO_PIN_4;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
+
+  /*Configure GPIO pins : PC6 PC7 */
+  GPIO_InitStruct.Pin = GPIO_PIN_6|GPIO_PIN_7;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
+
+  /*AnalogSwitch Config */
+  HAL_SYSCFG_AnalogSwitchConfig(SYSCFG_SWITCH_PA1, SYSCFG_SWITCH_PA1_CLOSE);
+
+  /* USER CODE BEGIN MX_GPIO_Init_2 */
+
+  /* USER CODE END MX_GPIO_Init_2 */
+}
+
+/* USER CODE BEGIN 4 */
+
+/* USER CODE END 4 */
+
+ /* MPU Configuration */
+
+void MPU_Config(void)
+{
+  MPU_Region_InitTypeDef MPU_InitStruct = {0};
+
+  /* Disables the MPU */
+  HAL_MPU_Disable();
+
+  /** Initializes and configures the Region and the memory to be protected
+  */
+  MPU_InitStruct.Enable = MPU_REGION_ENABLE;
+  MPU_InitStruct.Number = MPU_REGION_NUMBER0;
+  MPU_InitStruct.BaseAddress = 0x0;
+  MPU_InitStruct.Size = MPU_REGION_SIZE_4GB;
+  MPU_InitStruct.SubRegionDisable = 0x87;
+  MPU_InitStruct.TypeExtField = MPU_TEX_LEVEL0;
+  MPU_InitStruct.AccessPermission = MPU_REGION_NO_ACCESS;
+  MPU_InitStruct.DisableExec = MPU_INSTRUCTION_ACCESS_DISABLE;
+  MPU_InitStruct.IsShareable = MPU_ACCESS_SHAREABLE;
+  MPU_InitStruct.IsCacheable = MPU_ACCESS_NOT_CACHEABLE;
+  MPU_InitStruct.IsBufferable = MPU_ACCESS_NOT_BUFFERABLE;
+
+  HAL_MPU_ConfigRegion(&MPU_InitStruct);
+  /* Enables the MPU */
+  HAL_MPU_Enable(MPU_PRIVILEGED_DEFAULT);
+
+}
+
+/**
+  * @brief  This function is executed in case of error occurrence.
+  * @retval None
+  */
+void Error_Handler(void)
+{
+  /* USER CODE BEGIN Error_Handler_Debug */
+  /* User can add his own implementation to report the HAL error return state */
+  __disable_irq();
+  while (1)
+  {
+  }
+  /* USER CODE END Error_Handler_Debug */
+}
+#ifdef USE_FULL_ASSERT
+/**
+  * @brief  Reports the name of the source file and the source line number
+  *         where the assert_param error has occurred.
+  * @param  file: pointer to the source file name
+  * @param  line: assert_param error line source number
+  * @retval None
+  */
+void assert_failed(uint8_t *file, uint32_t line)
+{
+  /* USER CODE BEGIN 6 */
+  /* User can add his own implementation to report the file name and line number,
+     ex: printf("Wrong parameters value: file %s on line %d\r\n", file, line) */
+  /* USER CODE END 6 */
+}
+#endif /* USE_FULL_ASSERT */
