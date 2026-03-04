@@ -21,7 +21,6 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-#include "main.h"
 #include "lsm6dso_reg.h"
 #include "iis2mdc_reg.h"
 #include <stdio.h>
