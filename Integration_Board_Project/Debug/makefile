@@ -1,6 +1,6 @@
 ################################################################################
 # Automatically-generated file. Do not edit!
-# Toolchain: GNU Tools for STM32 (13.3.rel1)
+# Toolchain: GNU Tools for STM32 (14.3.rel1)
 ################################################################################
 
 -include ../makefile.init
@@ -34,34 +34,34 @@ $(wildcard ../makefile.init) \
 $(wildcard ../makefile.targets) \
 
 
-BUILD_ARTIFACT_NAME := lsm6do + iis2
+BUILD_ARTIFACT_NAME := Integration_Board_Project
 BUILD_ARTIFACT_EXTENSION := elf
 BUILD_ARTIFACT_PREFIX :=
 BUILD_ARTIFACT := $(BUILD_ARTIFACT_PREFIX)$(BUILD_ARTIFACT_NAME)$(if $(BUILD_ARTIFACT_EXTENSION),.$(BUILD_ARTIFACT_EXTENSION),)
 
 # Add inputs and outputs from these tool invocations to the build variables 
 EXECUTABLES += \
-lsm6do\ +\ iis2.elf \
+Integration_Board_Project.elf \
 
 MAP_FILES += \
-lsm6do\ +\ iis2.map \
+Integration_Board_Project.map \
 
 SIZE_OUTPUT += \
 default.size.stdout \
 
 OBJDUMP_LIST += \
-lsm6do\ +\ iis2.list \
+Integration_Board_Project.list \
 
 
 # All Target
 all: main-build
 
 # Main-build Target
-main-build: lsm6do\ +\ iis2.elf secondary-outputs
+main-build: Integration_Board_Project.elf secondary-outputs
 
 # Tool invocations
-lsm6do\ +\ iis2.elf lsm6do\ +\ iis2.map: $(OBJS) $(USER_OBJS) /Users/a61411/Desktop/lsm6do\ +\ iis2/STM32H7A3RGTX_FLASH.ld makefile objects.list $(OPTIONAL_TOOL_DEPS)
-	arm-none-eabi-gcc -o "lsm6do + iis2.elf" @"objects.list" $(USER_OBJS) $(LIBS) -mcpu=cortex-m7 -T"/Users/a61411/Desktop/lsm6do + iis2/STM32H7A3RGTX_FLASH.ld" --specs=nosys.specs -Wl,-Map="lsm6do + iis2.map" -Wl,--gc-sections -static -u _printf_float --specs=nano.specs -mfpu=fpv5-d16 -mfloat-abi=hard -mthumb -Wl,--start-group -lc -lm -Wl,--end-group
+Integration_Board_Project.elf Integration_Board_Project.map: $(OBJS) $(USER_OBJS) C:\Users\Jayden\git\ADCS_Integration_Board\Integration_Board_Project\STM32H7A3RGTX_FLASH.ld makefile objects.list $(OPTIONAL_TOOL_DEPS)
+	arm-none-eabi-gcc -o "Integration_Board_Project.elf" @"objects.list" $(USER_OBJS) $(LIBS) -mcpu=cortex-m7 -T"C:\Users\Jayden\git\ADCS_Integration_Board\Integration_Board_Project\STM32H7A3RGTX_FLASH.ld" --specs=nosys.specs -Wl,-Map="Integration_Board_Project.map" -Wl,--gc-sections -static -u _printf_float --specs=nano.specs -mfpu=fpv5-d16 -mfloat-abi=hard -mthumb -Wl,--start-group -lc -lm -Wl,--end-group
 	@echo 'Finished building target: $@'
 	@echo ' '
 
@@ -70,14 +70,14 @@ default.size.stdout: $(EXECUTABLES) makefile objects.list $(OPTIONAL_TOOL_DEPS)
 	@echo 'Finished building: $@'
 	@echo ' '
 
-lsm6do\ +\ iis2.list: $(EXECUTABLES) makefile objects.list $(OPTIONAL_TOOL_DEPS)
-	arm-none-eabi-objdump -h -S $(EXECUTABLES) > "lsm6do + iis2.list"
+Integration_Board_Project.list: $(EXECUTABLES) makefile objects.list $(OPTIONAL_TOOL_DEPS)
+	arm-none-eabi-objdump -h -S $(EXECUTABLES) > "Integration_Board_Project.list"
 	@echo 'Finished building: $@'
 	@echo ' '
 
 # Other Targets
 clean:
-	-$(RM) default.size.stdout lsm6do\ +\ iis2.elf lsm6do\ +\ iis2.list lsm6do\ +\ iis2.map lsm6do\\ +\\ iis2.elf
+	-$(RM) Integration_Board_Project.elf Integration_Board_Project.list Integration_Board_Project.map default.size.stdout
 	-@echo ' '
 
 secondary-outputs: $(SIZE_OUTPUT) $(OBJDUMP_LIST)

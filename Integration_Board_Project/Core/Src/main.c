@@ -44,6 +44,8 @@
 /* USER CODE END PM */
 
 /* Private variables ---------------------------------------------------------*/
+ADC_HandleTypeDef hadc1;
+DMA_HandleTypeDef hdma_adc1;
 
 SPI_HandleTypeDef hspi1;
 SPI_HandleTypeDef hspi2;
@@ -61,11 +63,13 @@ UART_HandleTypeDef huart1;
 void SystemClock_Config(void);
 static void MPU_Config(void);
 static void MX_GPIO_Init(void);
+static void MX_DMA_Init(void);
 static void MX_SPI1_Init(void);
 static void MX_USART1_UART_Init(void);
 static void MX_SPI2_Init(void);
 static void MX_TIM2_Init(void);
 static void MX_TIM3_Init(void);
+static void MX_ADC1_Init(void);
 /* USER CODE BEGIN PFP */
 
 /* USER CODE END PFP */
@@ -134,6 +138,14 @@ float raw_accel_to_mss(int16_t raw)
 float raw_gyro_to_degreespersecond(int16_t raw){
 	return raw * 0.00875f; //value from data sheet -- angular rate sensitivity type
 }
+
+uint16_t sun[2];
+int ADC_Finished = 0;
+int count = 0;
+void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef *hadc)
+{
+	ADC_Finished = 1;
+}
 /* USER CODE END 0 */
 
 /**
@@ -168,11 +180,13 @@ int main(void)
 
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
+  MX_DMA_Init();
   MX_SPI1_Init();
   MX_USART1_UART_Init();
   MX_SPI2_Init();
   MX_TIM2_Init();
   MX_TIM3_Init();
+  MX_ADC1_Init();
   /* USER CODE BEGIN 2 */
   // LSM6DSO initialize
   lsm6dso_ctx.write_reg = lsm6dso_write;
@@ -233,6 +247,12 @@ int main(void)
   char mag_data[64];
 
   float dt = 0.0f;
+  
+  /* testing Sun sensors */ 
+
+  HAL_ADC_Start_DMA(&hadc1, (uint32_t*)sun, 2);
+
+  
 
 
 	HAL_TIM_PWM_Start(&htim2, TIM_CHANNEL_1);
@@ -264,14 +284,13 @@ int main(void)
   	HAL_Delay (3);
   }
 
-  float offset_x = sumx/(n-1);
-  float offset_y = sumy/(n-1);
-  float offset_z = sumz/(n-1);
-	sprintf(OFFSET, "OFFSET X=%.5f Y=%.5f Z=%.5f \r\n",offset_x, offset_y, offset_z);
-	HAL_UART_Transmit(&huart1, (uint8_t *)OFFSET, strlen(OFFSET), HAL_MAX_DELAY);
-	HAL_Delay(2000);
+//  float offset_x = sumx/(n-1);
+//  float offset_y = sumy/(n-1);
+//  float offset_z = sumz/(n-1);
+//	sprintf(OFFSET, "OFFSET X=%.5f Y=%.5f Z=%.5f \r\n",offset_x, offset_y, offset_z);
+//	HAL_UART_Transmit(&huart1, (uint8_t *)OFFSET, strlen(OFFSET), HAL_MAX_DELAY);
+//	HAL_Delay(2000);
 
-	//HAL_GPIO_WritePin(GPIOA, GPIO_PIN_3, GPIO_PIN_SET);
 
 
 
@@ -285,42 +304,62 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-  	//getting dt from integrating gyro
-  	uint32_t now = HAL_GetTick();
-  	float dt = (now - last_tick	) / 1000.0f;
-  	last_tick = now;
+	  count++;
+	  HAL_Delay(500);
 
-  	//accelerometer
-      lsm6dso_acceleration_raw_get(&lsm6dso_ctx, raw_accel);
+	  if (ADC_Finished == 1){
+		  ADC_Finished = 0;
+		  HAL_ADC_Start_DMA(&hadc1, (uint32_t*)sun, 2);
+	  }
+//	  uint16_t SUN_Zp = sun[0]; //this block can be deleted
+//	  uint16_t SUN_Xm = sun[1];
+//	  sprintf(sun_outputs, "Z Positive: %u, X Negative: %u \r\n ", SUN_Zp, SUN_Xm);
+//	  HAL_UART_Transmit(&huart1,(uint8_t*)sun_outputs, strlen(sun_outputs), HAL_MAX_DELAY);
+//	  HAL_Delay(500);
 
-      accel_mss[0] = raw_accel_to_mss(raw_accel[0]);
-      accel_mss[1] = raw_accel_to_mss(raw_accel[1]);
-      accel_mss[2] = raw_accel_to_mss(raw_accel[2]);
+//	  HAL_ADC_Start(&hadc1); //this block can be deleted
+//	  HAL_ADC_PollForConversion(&hadc1, 100);
+//	  sun_Zp = HAL_ADC_GetValue(&hadc1);
+//	  sprintf(sun_output, "Sun: %u \r\n ", sun_Zp);
+//	  HAL_UART_Transmit(&huart1, (uint8_t*)sun_output, strlen(sun_output), HAL_MAX_DELAY);
+//	  HAL_Delay(500);
 
-      snprintf(accel_data, sizeof(accel_data), "Accel X=%.2f Y=%.2f Z=%.2f\r\n", accel_mss[1], -accel_mss[0], accel_mss[2]);
-      HAL_UART_Transmit(&huart1, (uint8_t *)accel_data, strlen(accel_data), HAL_MAX_DELAY);
-
-      //gyro
-      lsm6dso_angular_rate_raw_get(&lsm6dso_ctx, raw_gyro);
-
-      gyro_intermediate[0]= raw_gyro_to_degreespersecond(raw_gyro[0]) -offset_x ;
-      gyro_intermediate[1]= -raw_gyro_to_degreespersecond(raw_gyro[1]) - offset_y ;
-      gyro_intermediate[2]= raw_gyro_to_degreespersecond(raw_gyro[2]) - offset_z;
-//        snprintf(gyro_data, sizeof(gyro_data), "GYRO X=%.2f Y=%.2f Z=%.2f \r\n", gyro_intermediate[0], gyro_intermediate[1], gyro_intermediate[2]);
-//        HAL_UART_Transmit(&huart1, (uint8_t *)gyro_data, strlen(gyro_data), HAL_MAX_DELAY);
-      G_X_roll += (gyro_intermediate[0]) * dt;
-      G_Y_pitch += (gyro_intermediate[1] )* dt ;
-      G_Z_yaw += (gyro_intermediate[2]) * dt ;
-
-      sprintf(Gyro_accum, "GYRO roll=%.2f pitch=%.2f yaw=%.2f \r\n",G_X_roll, G_Y_pitch, G_Z_yaw);
-      HAL_UART_Transmit(&huart1, (uint8_t *)Gyro_accum, strlen(Gyro_accum), HAL_MAX_DELAY);
-
-
-     // loop for magnetometer data
-      iis2mdc_magnetic_raw_get(&iis2mdc_ctx, raw_mag);
-      sprintf(mag_data, "MAG DATA  X: %i Y: %i Z: %i \r\n", raw_mag[0], raw_mag[1], raw_mag[2]);
-      HAL_UART_Transmit(&huart1, (uint8_t*)mag_data, strlen(mag_data), HAL_MAX_DELAY);
-      HAL_Delay(10);
+//  	//getting dt from integrating gyro
+//  	uint32_t now = HAL_GetTick();
+//  	float dt = (now - last_tick	) / 1000.0f;
+//  	last_tick = now;
+//
+//  	//accelerometer
+//      lsm6dso_acceleration_raw_get(&lsm6dso_ctx, raw_accel);
+//
+//      accel_mss[0] = raw_accel_to_mss(raw_accel[0]);
+//      accel_mss[1] = raw_accel_to_mss(raw_accel[1]);
+//      accel_mss[2] = raw_accel_to_mss(raw_accel[2]);
+//
+//      snprintf(accel_data, sizeof(accel_data), "Accel X=%.2f Y=%.2f Z=%.2f\r\n", accel_mss[1], -accel_mss[0], accel_mss[2]);
+//      HAL_UART_Transmit(&huart1, (uint8_t *)accel_data, strlen(accel_data), HAL_MAX_DELAY);
+//
+//      //gyro
+//      lsm6dso_angular_rate_raw_get(&lsm6dso_ctx, raw_gyro);
+//
+//      gyro_intermediate[0]= raw_gyro_to_degreespersecond(raw_gyro[0]) -offset_x ;
+//      gyro_intermediate[1]= -raw_gyro_to_degreespersecond(raw_gyro[1]) - offset_y ;
+//      gyro_intermediate[2]= raw_gyro_to_degreespersecond(raw_gyro[2]) - offset_z;
+////        snprintf(gyro_data, sizeof(gyro_data), "GYRO X=%.2f Y=%.2f Z=%.2f \r\n", gyro_intermediate[0], gyro_intermediate[1], gyro_intermediate[2]);
+////        HAL_UART_Transmit(&huart1, (uint8_t *)gyro_data, strlen(gyro_data), HAL_MAX_DELAY);
+//      G_X_roll += (gyro_intermediate[0]) * dt;
+//      G_Y_pitch += (gyro_intermediate[1] )* dt ;
+//      G_Z_yaw += (gyro_intermediate[2]) * dt ;
+//
+//      sprintf(Gyro_accum, "GYRO roll=%.2f pitch=%.2f yaw=%.2f \r\n",G_X_roll, G_Y_pitch, G_Z_yaw);
+//      HAL_UART_Transmit(&huart1, (uint8_t *)Gyro_accum, strlen(Gyro_accum), HAL_MAX_DELAY);
+//
+//
+//     // loop for magnetometer data
+//      iis2mdc_magnetic_raw_get(&iis2mdc_ctx, raw_mag);
+//      sprintf(mag_data, "MAG DATA  X: %i Y: %i Z: %i \r\n", raw_mag[0], raw_mag[1], raw_mag[2]);
+//      HAL_UART_Transmit(&huart1, (uint8_t*)mag_data, strlen(mag_data), HAL_MAX_DELAY);
+//      HAL_Delay(10);
   }
   /* USER CODE END 3 */
 }
@@ -385,6 +424,83 @@ void SystemClock_Config(void)
   {
     Error_Handler();
   }
+}
+
+/**
+  * @brief ADC1 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_ADC1_Init(void)
+{
+
+  /* USER CODE BEGIN ADC1_Init 0 */
+
+  /* USER CODE END ADC1_Init 0 */
+
+  ADC_MultiModeTypeDef multimode = {0};
+  ADC_ChannelConfTypeDef sConfig = {0};
+
+  /* USER CODE BEGIN ADC1_Init 1 */
+
+  /* USER CODE END ADC1_Init 1 */
+
+  /** Common config
+  */
+  hadc1.Instance = ADC1;
+  hadc1.Init.ClockPrescaler = ADC_CLOCK_ASYNC_DIV1;
+  hadc1.Init.Resolution = ADC_RESOLUTION_16B;
+  hadc1.Init.ScanConvMode = ADC_SCAN_ENABLE;
+  hadc1.Init.EOCSelection = ADC_EOC_SINGLE_CONV;
+  hadc1.Init.LowPowerAutoWait = DISABLE;
+  hadc1.Init.ContinuousConvMode = DISABLE;
+  hadc1.Init.NbrOfConversion = 2;
+  hadc1.Init.DiscontinuousConvMode = DISABLE;
+  hadc1.Init.ExternalTrigConv = ADC_SOFTWARE_START;
+  hadc1.Init.ExternalTrigConvEdge = ADC_EXTERNALTRIGCONVEDGE_NONE;
+  hadc1.Init.ConversionDataManagement = ADC_CONVERSIONDATA_DMA_ONESHOT;
+  hadc1.Init.Overrun = ADC_OVR_DATA_PRESERVED;
+  hadc1.Init.LeftBitShift = ADC_LEFTBITSHIFT_NONE;
+  hadc1.Init.OversamplingMode = DISABLE;
+  if (HAL_ADC_Init(&hadc1) != HAL_OK)
+  {
+    Error_Handler();
+  }
+
+  /** Configure the ADC multi-mode
+  */
+  multimode.Mode = ADC_MODE_INDEPENDENT;
+  if (HAL_ADCEx_MultiModeConfigChannel(&hadc1, &multimode) != HAL_OK)
+  {
+    Error_Handler();
+  }
+
+  /** Configure Regular Channel
+  */
+  sConfig.Channel = ADC_CHANNEL_4;
+  sConfig.Rank = ADC_REGULAR_RANK_1;
+  sConfig.SamplingTime = ADC_SAMPLETIME_1CYCLE_5;
+  sConfig.SingleDiff = ADC_SINGLE_ENDED;
+  sConfig.OffsetNumber = ADC_OFFSET_NONE;
+  sConfig.Offset = 0;
+  sConfig.OffsetSignedSaturation = DISABLE;
+  if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+
+  /** Configure Regular Channel
+  */
+  sConfig.Channel = ADC_CHANNEL_8;
+  sConfig.Rank = ADC_REGULAR_RANK_2;
+  if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN ADC1_Init 2 */
+
+  /* USER CODE END ADC1_Init 2 */
+
 }
 
 /**
@@ -652,6 +768,22 @@ static void MX_USART1_UART_Init(void)
   /* USER CODE BEGIN USART1_Init 2 */
 
   /* USER CODE END USART1_Init 2 */
+
+}
+
+/**
+  * Enable DMA controller clock
+  */
+static void MX_DMA_Init(void)
+{
+
+  /* DMA controller clock enable */
+  __HAL_RCC_DMA1_CLK_ENABLE();
+
+  /* DMA interrupt init */
+  /* DMA1_Stream0_IRQn interrupt configuration */
+  HAL_NVIC_SetPriority(DMA1_Stream0_IRQn, 0, 0);
+  HAL_NVIC_EnableIRQ(DMA1_Stream0_IRQn);
 
 }
 
