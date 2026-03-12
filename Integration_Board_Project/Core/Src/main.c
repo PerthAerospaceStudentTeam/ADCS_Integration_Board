@@ -141,7 +141,6 @@ float raw_gyro_to_degreespersecond(int16_t raw){
 
 uint16_t sun[2];
 int ADC_Finished = 0;
-int count = 0;
 void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef *hadc)
 {
 	ADC_Finished = 1;
@@ -250,11 +249,19 @@ int main(void)
   
   /* testing Sun sensors */ 
 
-  HAL_ADC_Start_DMA(&hadc1, (uint32_t*)sun, 2);
+  HAL_ADC_Start_DMA(&hadc1, (uint32_t*)sun, 6);
+  int16_t Z_Minus;
+  int16_t Z_Plus;
+  int16_t X_Plus;
+  int16_t Y_Plus;
+  int16_t X_Minus;
+  int16_t Y_Minus;
+
+  char SUN_DATA[100];
 
   
 
-
+// testing the pwm channels are working for all the magnetometers
 	HAL_TIM_PWM_Start(&htim2, TIM_CHANNEL_1);
 	__HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_1, 123); // ~50% of 255
 	HAL_TIM_PWM_Start(&htim2, TIM_CHANNEL_4);
@@ -276,7 +283,7 @@ int main(void)
   float sumx = 0.0f, sumy = 0.0f, sumz = 0.0f;
   char waiting[] = "Calibrating offset values";
   HAL_UART_Transmit(&huart1, (uint8_t*) waiting, strlen(waiting) ,100);
-  int n = 1000; //number of calibration trials
+  int n = 1; //number of calibration trials
   for (int i = 0; i < n; i++){
   	sumx += gyro_intermediate[0];
   	sumy += gyro_intermediate[1];
@@ -304,13 +311,24 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-	  count++;
 	  HAL_Delay(500);
 
 	  if (ADC_Finished == 1){
 		  ADC_Finished = 0;
-		  HAL_ADC_Start_DMA(&hadc1, (uint32_t*)sun, 2);
+		  for(uint8_t i = 0; i<hadc1.Init.NbrOfConversion; i++){
+			  Z_Minus= sun[0];
+			  Z_Plus = sun[1];
+			  X_Plus = sun[2];
+			  Y_Plus = sun[3];
+			  X_Minus = sun[4];
+			  Y_Minus = sun[5];
+		  }
+		  sprintf(SUN_DATA, "-Z = %u , +Z = %u, -X = %u, +X = %u, -Y = %u, +Y = %u \r\n", Z_Minus, Z_Plus, X_Minus, X_Plus, Y_Minus, Y_Plus);
+		  HAL_UART_Transmit(&huart1, (uint8_t*)SUN_DATA, strlen(SUN_DATA), HAL_MAX_DELAY);
+		  HAL_ADC_Start_DMA(&hadc1, (uint32_t*)sun, 6);
 	  }
+
+
 //	  uint16_t SUN_Zp = sun[0]; //this block can be deleted
 //	  uint16_t SUN_Xm = sun[1];
 //	  sprintf(sun_outputs, "Z Positive: %u, X Negative: %u \r\n ", SUN_Zp, SUN_Xm);
@@ -453,8 +471,8 @@ static void MX_ADC1_Init(void)
   hadc1.Init.ScanConvMode = ADC_SCAN_ENABLE;
   hadc1.Init.EOCSelection = ADC_EOC_SINGLE_CONV;
   hadc1.Init.LowPowerAutoWait = DISABLE;
-  hadc1.Init.ContinuousConvMode = DISABLE;
-  hadc1.Init.NbrOfConversion = 2;
+  hadc1.Init.ContinuousConvMode = ENABLE;
+  hadc1.Init.NbrOfConversion = 6;
   hadc1.Init.DiscontinuousConvMode = DISABLE;
   hadc1.Init.ExternalTrigConv = ADC_SOFTWARE_START;
   hadc1.Init.ExternalTrigConvEdge = ADC_EXTERNALTRIGCONVEDGE_NONE;
@@ -477,7 +495,7 @@ static void MX_ADC1_Init(void)
 
   /** Configure Regular Channel
   */
-  sConfig.Channel = ADC_CHANNEL_4;
+  sConfig.Channel = ADC_CHANNEL_3;
   sConfig.Rank = ADC_REGULAR_RANK_1;
   sConfig.SamplingTime = ADC_SAMPLETIME_1CYCLE_5;
   sConfig.SingleDiff = ADC_SINGLE_ENDED;
@@ -491,8 +509,44 @@ static void MX_ADC1_Init(void)
 
   /** Configure Regular Channel
   */
-  sConfig.Channel = ADC_CHANNEL_8;
+  sConfig.Channel = ADC_CHANNEL_4;
   sConfig.Rank = ADC_REGULAR_RANK_2;
+  if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+
+  /** Configure Regular Channel
+  */
+  sConfig.Channel = ADC_CHANNEL_5;
+  sConfig.Rank = ADC_REGULAR_RANK_3;
+  if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+
+  /** Configure Regular Channel
+  */
+  sConfig.Channel = ADC_CHANNEL_7;
+  sConfig.Rank = ADC_REGULAR_RANK_4;
+  if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+
+  /** Configure Regular Channel
+  */
+  sConfig.Channel = ADC_CHANNEL_8;
+  sConfig.Rank = ADC_REGULAR_RANK_5;
+  if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+
+  /** Configure Regular Channel
+  */
+  sConfig.Channel = ADC_CHANNEL_9;
+  sConfig.Rank = ADC_REGULAR_RANK_6;
   if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK)
   {
     Error_Handler();
