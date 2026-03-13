@@ -139,7 +139,7 @@ float raw_gyro_to_degreespersecond(int16_t raw){
 	return raw * 0.00875f; //value from data sheet -- angular rate sensitivity type
 }
 
-uint16_t sun[2];
+uint16_t sun[6];
 int ADC_Finished = 0;
 void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef *hadc)
 {
