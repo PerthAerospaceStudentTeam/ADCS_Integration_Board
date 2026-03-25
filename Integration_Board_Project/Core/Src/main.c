@@ -139,12 +139,30 @@ float raw_gyro_to_degreespersecond(int16_t raw){
 	return raw * 0.00875f; //value from data sheet -- angular rate sensitivity type
 }
 
+
+// interrupt handler to ensure smooth ADC readings
 uint16_t sun[6];
 int ADC_Finished = 0;
 void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef *hadc)
 {
 	ADC_Finished = 1;
 }
+
+
+
+//initiate variables for sun sensors
+int maxIntensity[6]; // Maximum sensor values
+int minIntensity[6]; // Minimum sensor values
+void resetCalibration() {
+    for (int i = 0; i < 6; i++) {
+        maxIntensity[i] = 0;
+        minIntensity[i] = 65535; // 12-bit ADC range
+    }
+    char SUN_Calibration[] = "Calibration Of ADC Sun Sensors";
+    HAL_UART_Transmit(&huart1, (uint8_t*) SUN_Calibration, strlen(SUN_Calibration) ,100);
+}
+
+
 /* USER CODE END 0 */
 
 /**
@@ -259,6 +277,8 @@ int main(void)
 
   char SUN_DATA[100];
 
+
+
   
 
 // testing the pwm channels are working for all the magnetometers
@@ -313,20 +333,24 @@ int main(void)
     /* USER CODE BEGIN 3 */
 	  HAL_Delay(500);
 
-	  if (ADC_Finished == 1){
-		  ADC_Finished = 0;
-		  for(uint8_t i = 0; i<hadc1.Init.NbrOfConversion; i++){
-			  Z_Minus= sun[0];
-			  Z_Plus = sun[1];
-			  X_Plus = sun[2];
-			  Y_Plus = sun[3];
-			  X_Minus = sun[4];
-			  Y_Minus = sun[5];
-		  }
-		  sprintf(SUN_DATA, "-Z = %u , +Z = %u, -X = %u, +X = %u, -Y = %u, +Y = %u \r\n", Z_Minus, Z_Plus, X_Minus, X_Plus, Y_Minus, Y_Plus);
-		  HAL_UART_Transmit(&huart1, (uint8_t*)SUN_DATA, strlen(SUN_DATA), HAL_MAX_DELAY);
-		  HAL_ADC_Start_DMA(&hadc1, (uint32_t*)sun, 6);
-	  }
+
+
+
+	  //code to display raw data from sensors in the form of 2^16- 1
+//	  if (ADC_Finished == 1){
+//		  ADC_Finished = 0;
+//		  for(uint8_t i = 0; i<hadc1.Init.NbrOfConversion; i++){
+//			  Z_Minus= sun[0];
+//			  Z_Plus = sun[1];
+//			  X_Plus = sun[2];
+//			  Y_Plus = sun[3];
+//			  X_Minus = sun[4];
+//			  Y_Minus = sun[5];
+//		  }
+//		  sprintf(SUN_DATA, "-Z = %u , +Z = %u, -X = %u, +X = %u, -Y = %u, +Y = %u \r\n", Z_Minus, Z_Plus, X_Minus, X_Plus, Y_Minus, Y_Plus);
+//		  HAL_UART_Transmit(&huart1, (uint8_t*)SUN_DATA, strlen(SUN_DATA), HAL_MAX_DELAY);
+//		  HAL_ADC_Start_DMA(&hadc1, (uint32_t*)sun, 6);
+//	  }
 
 
 //	  uint16_t SUN_Zp = sun[0]; //this block can be deleted
