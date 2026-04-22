@@ -60,8 +60,8 @@ all: main-build
 main-build: Sun_Sensor_algo.elf secondary-outputs
 
 # Tool invocations
-Sun_Sensor_algo.elf Sun_Sensor_algo.map: $(OBJS) $(USER_OBJS) C:\Users\Jayden\stm32cubeMXprojects\Sun_Sensor_algo\STM32H7A3RGTX_FLASH.ld makefile objects.list $(OPTIONAL_TOOL_DEPS)
-	arm-none-eabi-gcc -o "Sun_Sensor_algo.elf" @"objects.list" $(USER_OBJS) $(LIBS) -mcpu=cortex-m7 -T"C:\Users\Jayden\stm32cubeMXprojects\Sun_Sensor_algo\STM32H7A3RGTX_FLASH.ld" --specs=nosys.specs -Wl,-Map="Sun_Sensor_algo.map" -Wl,--gc-sections -static --specs=nano.specs -mfpu=fpv5-d16 -mfloat-abi=hard -mthumb -Wl,--start-group -lc -lm -Wl,--end-group
+Sun_Sensor_algo.elf Sun_Sensor_algo.map: $(OBJS) $(USER_OBJS) C:\Users\jayde\git\ADCS_Integration_Board\Sun_Sensor_algo\STM32H7A3RGTX_FLASH.ld makefile objects.list $(OPTIONAL_TOOL_DEPS)
+	arm-none-eabi-gcc -o "Sun_Sensor_algo.elf" @"objects.list" $(USER_OBJS) $(LIBS) -mcpu=cortex-m7 -T"C:\Users\jayde\git\ADCS_Integration_Board\Sun_Sensor_algo\STM32H7A3RGTX_FLASH.ld" --specs=nosys.specs -Wl,-Map="Sun_Sensor_algo.map" -Wl,--gc-sections -static --specs=nano.specs -mfpu=fpv5-d16 -mfloat-abi=hard -mthumb -Wl,--start-group -lc -lm -Wl,--end-group
 	@echo 'Finished building target: $@'
 	@echo ' '
 
