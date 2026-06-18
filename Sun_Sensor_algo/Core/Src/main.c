@@ -61,14 +61,17 @@ static void MX_ADC1_Init(void);
 /* USER CODE BEGIN 0 */
 
 //uint16_t sun[6];
-int ADC_Finished = 0;
-int count = 0;
+
+volatile int ADC_Finished = 0;
+
 void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef *hadc)
 {
-	ADC_Finished = 1;
-
+    if (hadc->Instance == ADC1)
+    {
+        ADC_Finished = 1;
+    }
 }
-uint16_t sun[6] = {10000, 59000, 35000, 10000, 35000, 10000}; //false sun data
+uint16_t sun[6] = {10000, 59000, 35000, 10000, 35000, 10000}; //false sun data//might have to change the axis because the data is read from [-Z, +Z, +X, +Y, -X, -Y]
 
 const char*Axes[] = {"Z", "-Z", "X", "-X", "Y", "-Y"};
 
@@ -168,51 +171,58 @@ int main(void)
   uint16_t globalMin = 65535;
   uint16_t globalMax = 0;
 
-  for (int i = 0; i < 6; i++) {
-      if (sun[i] > globalMax) globalMax = sun[i];
-      if (sun[i] < globalMin) globalMin = sun[i];
-  }
-  top3(sun, top_vals, top_idx);
-  for (int i = 0; i < 3; i++){
-	  top_lamb[i] = getLambertian(top_vals[i], globalMin, globalMax);
-  }
-
-  for (int i = 0; i < 3; i++) {
-      uint8_t idx  = top_idx[i];
-      float   sign = (idx % 2 == 0) ? 1.0f : -1.0f;
-      if      (idx <= 1) vec[2] += sign * top_lamb[i];  // Z
-      else if (idx <= 3) vec[0] += sign * top_lamb[i];  // X
-      else               vec[1] += sign * top_lamb[i];  // Y
-  }
-  float r = sqrtf(vec[0]*vec[0] + vec[1]*vec[1] + vec[2]*vec[2]);
-  if (r == 0.0f) r = 1.0f;
-  vec[0]/=r; //x
-  vec[1]/=r;// y
-  vec[2]/=r; // z
 
 
-  phi = atan2f(vec[1], vec[0]) * 180.0f / (float)M_PI;  // Azimuth
-  theta = acosf(vec[2])     * 180.0f / (float)M_PI;
-  elevation = 90.0f - theta;                      // Elevation
   HAL_ADC_Start_DMA(&hadc1, (uint32_t*)sun, 6);
-
   /* USER CODE END 2 */
+
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1)
   {
-	  count ++;
-	  HAL_Delay(200);
+
+      if (ADC_Finished == 1)
+      {
+          ADC_Finished = 0;
+
+          HAL_ADC_Stop_DMA(&hadc1);
+
+		  sun[1] = 2000;
+		  sun[2] = 2000;
+          sun[4] = 2000;
+
+          HAL_Delay(100);
+          for (int i = 0; i < 6; i++) {
+              if (sun[i] > globalMax) globalMax = sun[i];
+              if (sun[i] < globalMin) globalMin = sun[i];
+          }
+          top3(sun, top_vals, top_idx);
+          for (int i = 0; i < 3; i++){
+        	  top_lamb[i] = getLambertian(top_vals[i], globalMin, globalMax);
+          }
+
+          for (int i = 0; i < 3; i++) {
+              uint8_t idx  = top_idx[i];
+              float   sign = (idx % 2 == 0) ? 1.0f : -1.0f;
+              if      (idx <= 1) vec[2] += sign * top_lamb[i];  // Z
+              else if (idx <= 3) vec[0] += sign * top_lamb[i];  // X
+              else               vec[1] += sign * top_lamb[i];  // Y
+          }
+          float r = sqrtf(vec[0]*vec[0] + vec[1]*vec[1] + vec[2]*vec[2]);
+          if (r == 0.0f) r = 1.0f;
+          vec[0]/=r; //x
+          vec[1]/=r;// y
+          vec[2]/=r; // z
 
 
-	  if (ADC_Finished == 1){
-	      ADC_Finished = 0;
-	      HAL_ADC_Stop_DMA(&hadc1);
+          phi = atan2f(vec[1], vec[0]) * 180.0f / (float)M_PI;  // Azimuth
+          theta = acosf(vec[2])     * 180.0f / (float)M_PI;
+          elevation = 90.0f - theta;                      // Elevation
+          HAL_ADC_Start_DMA(&hadc1, (uint32_t*)sun, 6);
+      }
 
-	      HAL_ADC_Start_DMA(&hadc1, (uint32_t*)sun, 6);
 
-	  }
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
@@ -304,7 +314,7 @@ static void MX_ADC1_Init(void)
   hadc1.Init.ScanConvMode = ADC_SCAN_ENABLE;
   hadc1.Init.EOCSelection = ADC_EOC_SINGLE_CONV;
   hadc1.Init.LowPowerAutoWait = DISABLE;
-  hadc1.Init.ContinuousConvMode = ENABLE;
+  hadc1.Init.ContinuousConvMode = DISABLE;
   hadc1.Init.NbrOfConversion = 6;
   hadc1.Init.DiscontinuousConvMode = DISABLE;
   hadc1.Init.ExternalTrigConv = ADC_SOFTWARE_START;
@@ -329,7 +339,7 @@ static void MX_ADC1_Init(void)
   /** Configure Regular Channel
   */
   sConfig.Channel = ADC_CHANNEL_3;
-  sConfig.Rank = ADC_REGULAR_RANK_1;
+  sConfig.Rank = ADC_REGULAR_RANK_2;
   sConfig.SamplingTime = ADC_SAMPLETIME_1CYCLE_5;
   sConfig.SingleDiff = ADC_SINGLE_ENDED;
   sConfig.OffsetNumber = ADC_OFFSET_NONE;
@@ -343,7 +353,7 @@ static void MX_ADC1_Init(void)
   /** Configure Regular Channel
   */
   sConfig.Channel = ADC_CHANNEL_4;
-  sConfig.Rank = ADC_REGULAR_RANK_2;
+  sConfig.Rank = ADC_REGULAR_RANK_1;
   if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK)
   {
     Error_Handler();
@@ -361,7 +371,7 @@ static void MX_ADC1_Init(void)
   /** Configure Regular Channel
   */
   sConfig.Channel = ADC_CHANNEL_7;
-  sConfig.Rank = ADC_REGULAR_RANK_4;
+  sConfig.Rank = ADC_REGULAR_RANK_5;
   if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK)
   {
     Error_Handler();
@@ -370,7 +380,7 @@ static void MX_ADC1_Init(void)
   /** Configure Regular Channel
   */
   sConfig.Channel = ADC_CHANNEL_8;
-  sConfig.Rank = ADC_REGULAR_RANK_5;
+  sConfig.Rank = ADC_REGULAR_RANK_4;
   if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK)
   {
     Error_Handler();
