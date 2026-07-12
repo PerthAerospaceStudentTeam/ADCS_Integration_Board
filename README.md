@@ -10,9 +10,9 @@ Code base for the ADCS integration board.
 ## Usage
 Code to be used on PAST's ADCS Integration board, aims to run/test ADCS algorithms.
 Utilisises the STM32H7A3RGT6 as central MCU to retrieve data from sensors:
-	-LSM6DSOTR, 6-axis Inertial Measurement Unit
-	-IIS2MDCTR, Magnetometer 
-	-Sun Sensors
+	- LSM6DSOTR, 6-axis Inertial Measurement Unit
+	- IIS2MDCTR, Magnetometer 
+	- Sun Sensors
 
 ## Project Structure
 __Will update when able to consult with Jayden in person for more info on exact project structure__
