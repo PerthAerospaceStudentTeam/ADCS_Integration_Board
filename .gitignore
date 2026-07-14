@@ -25,3 +25,8 @@ logs/
 # Environment Files
 .env
 .env.local
+
+# Debug Output files
+Debug/*.list
+Debug/*.map
+Debug/*.elf
