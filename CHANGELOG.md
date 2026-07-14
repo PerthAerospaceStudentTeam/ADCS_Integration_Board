@@ -5,3 +5,5 @@
 ### Changed
 - Improved formatting of README in accordance with github standards
 - Untracked .DS_Store files in accordance with .gitignore contents
+- Untracked .settings subdirectories in project
+- Untracked .list, .map, .elf debug output files
