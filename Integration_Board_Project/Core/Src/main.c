@@ -79,16 +79,15 @@ static void MX_ADC1_Init(void);
 
 stmdev_ctx_t lsm6dso_ctx;
 stmdev_ctx_t iis2mdc_ctx;
+ 
+/* COMMUNICATION FUNCTIONS */
+/* Functions should not handle failed write operation itself (i.e. loop until success), this should be responsibility of calling function */
+/* All possible return values of functions correspond to COMMUNICATION_... macros defined in main.h */
 
 // LSM6DSO SPI1, CS = PB4
-// write_status = 0, success. 
-// write_status = 1, error.
 int32_t lsm6dso_write(void *handle, uint8_t reg,
                       const uint8_t *bufp, uint16_t len)
-{
-    /* Function should not handle failed write operation itself (i.e. loop until success), this should be responsibility of calling function */
-    /* All possible return values of function correspond to COMMUNICATION_... macros defined in main.h */
-    
+{ 
     reg &= 0x7F;
     HAL_GPIO_WritePin(GPIOB, GPIO_PIN_4, GPIO_PIN_RESET); // CS Low
 
