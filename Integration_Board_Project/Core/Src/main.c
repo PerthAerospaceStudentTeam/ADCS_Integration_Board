@@ -93,16 +93,12 @@ int32_t lsm6dso_write(void *handle, uint8_t reg,
     HAL_GPIO_WritePin(GPIOB, GPIO_PIN_4, GPIO_PIN_RESET); // CS Low
 
     /* write register address to peripheral */
-    HAL_StatusTypeDef register_write_status = HAL_SPI_Transmit(&hspi1, &reg, 1, 100)
+    int32_t write_status = HAL_SPI_Transmit(&hspi1, &reg, 1, 100)
 
-    switch(register_write_status) {
-      case HAL_OK:
-        /* only attempt to write data to peripheral if register write was successful */
-
+    /* only attempt to write data to peripheral if register write was successful */
+    if (write_status == COMMUNICATION_SUCCESS) {
+        write_status = HAL_SPI_Transmit(&hspi1, (uint8_t*)bufp, len, 100);
     }
-
-    /* write data itself to peripheral, determine if successful or not */
-    HAL_SPI_Transmit(&hspi1, (uint8_t*)bufp, len, 100);
 
     HAL_GPIO_WritePin(GPIOB, GPIO_PIN_4, GPIO_PIN_SET); // CS High
     return write_status;
@@ -113,11 +109,18 @@ int32_t lsm6dso_read(void *handle, uint8_t reg,
                      uint8_t *bufp, uint16_t len)
 {
 	  reg |= 0x80;
-	  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_4, GPIO_PIN_RESET);
-	  HAL_SPI_Transmit(&hspi1, &reg, 1, 1000);
-	  HAL_SPI_Receive(&hspi1, bufp, len, 1000);
+	  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_4, GPIO_PIN_RESET); //CS Low
+
+    /* write register address to peripheral */
+	  int32_t comm_status = HAL_SPI_Transmit(&hspi1, &reg, 1, 1000);
+
+    /* only attempt to read data from peripheral if register write was successful */
+    if (comm_status == COMMUNICATION_SUCCESS) {
+        comm_status = HAL_SPI_Receive(&hspi1, bufp, len, 1000);
+    }
+	  
 	  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_4, GPIO_PIN_SET);
-return 0;
+    return comm_status;
 }
 
 // IIS2MDC SPI2, CS = PB2
