@@ -86,31 +86,23 @@ stmdev_ctx_t iis2mdc_ctx;
 int32_t lsm6dso_write(void *handle, uint8_t reg,
                       const uint8_t *bufp, uint16_t len)
 {
-    /* Error handling for this function simply evaluates if write operations successful, should be improved further to return WHY write failed */
     /* Function should not handle failed write operation itself (i.e. loop until success), this should be responsibility of calling function */
-    int32_t write_status = 1;
-
+    /* All possible return values of function correspond to COMMUNICATION_... macros defined in main.h */
+    
     reg &= 0x7F;
     HAL_GPIO_WritePin(GPIOB, GPIO_PIN_4, GPIO_PIN_RESET); // CS Low
 
     /* write register address to peripheral */
-    HAL_StatusTypeDef register_write_status = HAL_SPI_Transmit(&hspi1, &reg, 1, 100);
-    
-    /* only attempt to write data to peripheral if register write was successful, (0x00U == HAL_OK) */
-    if (register_write_status == 0x00U) {
-      /* write data itself to peripheral, determine if successful or not */
-      if (HAL_SPI_Transmit(&hspi1, (uint8_t*)bufp, len, 100) == 0x00U) {
-        /* both register and data write to peripheral successful */
-        write_status = 0;
-      }
-      else {
-        /* failed to write data to peripheral */
-        write_status = 1;
-      }
+    HAL_StatusTypeDef register_write_status = HAL_SPI_Transmit(&hspi1, &reg, 1, 100)
+
+    switch(register_write_status) {
+      case HAL_OK:
+        /* only attempt to write data to peripheral if register write was successful */
+
     }
-    else {
-      write_status = 1;  
-    }
+
+    /* write data itself to peripheral, determine if successful or not */
+    HAL_SPI_Transmit(&hspi1, (uint8_t*)bufp, len, 100);
 
     HAL_GPIO_WritePin(GPIOB, GPIO_PIN_4, GPIO_PIN_SET); // CS High
     return write_status;
