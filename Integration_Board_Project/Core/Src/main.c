@@ -129,11 +129,17 @@ int32_t mag_platform_write(void *handle, uint8_t reg,
 {
     reg &= 0x7F;
     HAL_GPIO_WritePin(GPIOB, GPIO_PIN_2, GPIO_PIN_RESET);
-    HAL_SPI_Transmit(&hspi2, &reg, 1, HAL_MAX_DELAY);
-    HAL_SPI_Transmit(&hspi2, (uint8_t *)bufp, len, HAL_MAX_DELAY);
-    HAL_GPIO_WritePin(GPIOB, GPIO_PIN_2, GPIO_PIN_SET);
+    
+    /* write the register address to peripheral device */
+    int32_t write_status = HAL_SPI_Transmit(&hspi2, &reg, 1, HAL_MAX_DELAY);
 
-    return 0;
+    /* only attempt to write data to peripheral if register write was successful */
+    if (write_status == COMMUNICATION_SUCCESS) {
+        write_status = HAL_SPI_Transmit(&hspi2, (uint8_t *)bufp, len, HAL_MAX_DELAY);
+    }
+
+    HAL_GPIO_WritePin(GPIOB, GPIO_PIN_2, GPIO_PIN_SET);
+    return write_status;
 }
 
 int32_t mag_platform_read(void *handle, uint8_t reg,
