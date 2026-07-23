@@ -17,3 +17,14 @@ Current consumption:
 - power-down: 1.5 μA
 
 ## Communication Protocol and Message Structure
+IIS2MDC Magnetometer is capable of both Serial Peripheral Interface (SPI) and Inter-Intergrated Communication (I2C) serial communication protocols.
+
+SPI clock frequency: 10000kHz
+
+I2C:  
+Capable of a 'fast', 'fast+' and 'high speed' mode.
+Clock frequency:  
+- standard: 100kHz
+- fast: 400kHz
+- fast+: 1000kHz
+- high speed: 3400kHz
