@@ -1,4 +1,4 @@
-## Version-1 - 2026-07-12
+## Version-1 - 2026-07-23
 ### Added
 - created CHANGELOG.md file
 - created .gitignore file
