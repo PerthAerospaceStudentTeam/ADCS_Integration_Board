@@ -14,12 +14,12 @@ It covers:
 This document does not detail the actual software implementation of the coordination interface.
 
 ## Definitions and Acronyms
-AIB - ADCS Integration Board
+AIB - ADCS Integration Board  
+AIB MCU refers to the [STM32H7A3RGT6](https://www.st.com/resource/en/datasheet/stm32h7a3ai.pdf)
 
-## Physical Interface Constraints
-
+## Physical Interface Constraints  
 ### Electrical Characteristics
-Supply voltage: 
+Tolerable Supply voltage range by IIS2MDC Magnetometer: 
 - Minimum: 1.71V, Absolute Minimum: -0.3V 
 - Typical: 2.5V 
 - Maximum: 3.6V, Absolute Maximum: 4.8V
@@ -30,6 +30,8 @@ Current consumption:
 - power-down: 1.5 μA
 
 ## Communication Protocol and Message Structure
+IIS2MDC Magnetometer is connected to AIB MCU via SPI2 Interface. Thus IIS2MDC is restricted to use SPI communication with MCU.
+
 IIS2MDC Magnetometer is capable of both Serial Peripheral Interface (SPI) and Inter-Intergrated Communication (I2C) serial communication protocols.
 
 SPI clock frequency: 10000kHz
