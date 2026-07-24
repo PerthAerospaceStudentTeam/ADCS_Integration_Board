@@ -18,8 +18,8 @@ AIB - ADCS Integration Board
 AIB MCU refers to the [STM32H7A3RGT6](https://www.st.com/resource/en/datasheet/stm32h7a3ai.pdf)
 
 ## Physical Interface Constraints  
-### Electrical Characteristics
-Tolerable Supply voltage range by IIS2MDC Magnetometer: 
+### Electrical Characteristics of IIS2MDC Magnetometer
+Tolerable Supply voltage range: 
 - Minimum: 1.71V, Absolute Minimum: -0.3V 
 - Typical: 2.5V 
 - Maximum: 3.6V, Absolute Maximum: 4.8V
@@ -29,17 +29,17 @@ Current consumption:
 - low-power mode (offset cancellation turned off): 23 μA
 - power-down: 1.5 μA
 
-## Communication Protocol and Message Structure
-IIS2MDC Magnetometer is connected to AIB MCU via SPI2 Interface. Thus IIS2MDC is restricted to use SPI communication with MCU.
-
+## Communication Protocol
 IIS2MDC Magnetometer is capable of both Serial Peripheral Interface (SPI) and Inter-Intergrated Communication (I2C) serial communication protocols.
 
-SPI clock frequency: 10000kHz
+IIS2MDC Magnetometer is connected to AIB MCU via SPI2 Interface, thus communication between the AIB MCU and IIS2MDC is restricted to use SPI communication. The SPI bus on IIS2MDC Magnetometer is a bus slave, allowing a master to read from/write to its registers using CS, SPC & SDI/O pins.  
 
-I2C:  
-Capable of a 'fast', 'fast+' and 'high speed' mode.
-Clock frequency:  
-- standard: 100kHz
-- fast: 400kHz
-- fast+: 1000kHz
-- high speed: 3400kHz
+A SPI write/read operation is performed in 16 clock pulses, inital 8 pulses used to transmit first 8 bits corresponding to address of register and read/write flag, subsequent 8 pulses then for transmitting single byte to/from IIS2MDC, additional octet-byte read/writes require an additional 8 clock pulses ontop of previous pulses.  
+
+#### SPI Slave (IIS2MDC) Timings:
+- SPI minimum clock cycle: 100ns 
+- SPI maximum clock frequency: 10000kHz
+- SPI minimum CS setup time: 5ns
+- SPI minimum CS hold time: 20ns
+
+## Message Structure 
