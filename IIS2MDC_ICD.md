@@ -1,9 +1,22 @@
-# Interface Control Document for IIS2MDC Magnetometer
+# IIS2MDC Magnetometer Interface Control Document
 
 ## Scope
-This document outlines communication interface for the [IIS2MDC Magnetometer](https://www.st.com/resource/en/datasheet/iis2mdc.pdf).
+This document defines the interface enabling the AIB's MCU and one or more external controllers to coordinate the operation of the AIB's [IIS2MDC magnetometers](https://www.st.com/resource/en/datasheet/iis2mdc.pdf) with external activities that may generate magnetic fields capable of interfering with magnetometer measurements.
 
-## Physical Constraints
+It covers:
+- Physical interface constrains
+- Communication protocol
+- Timing requirements
+- Message format and definitions
+- Coordination protocol (interface behaviour)
+- Message sequences
+
+This document does not detail the actual software implementation of the coordination interface.
+
+## Definitions and Acronyms
+AIB - ADCS Integration Board
+
+## Physical Interface Constraints
 
 ### Electrical Characteristics
 Supply voltage: 
