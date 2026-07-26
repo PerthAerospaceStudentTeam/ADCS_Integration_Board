@@ -1,0 +1,32 @@
+# .gitignore file used for the ADCS Integration board repository
+# (heavily based on the Software-orientation, GitHub Standards slide)
+
+# Build Artifacts
+build/
+dist/
+out/
+target/
+
+# Dependency Directories
+node_modules/
+venv/
+__pycache__/
+
+# IDE / Code Editor Files
+.vscode/
+.idea/
+.DS_Store
+.settings/
+
+# Log Files
+*.log
+logs/
+
+# Environment Files
+.env
+.env.local
+
+# Debug Output files
+Debug/*.list
+Debug/*.map
+Debug/*.elf
