@@ -29,6 +29,12 @@ Current consumption:
 - low-power mode (offset cancellation turned off): 23 μA
 - power-down: 1.5 μA
 
+### Pin Interface between AIB MCU and Magnetometer
+AIB MCU is connected to the IIS2MDC magnetometer using the SPI2 interface, requiring the following pins to be used on AIB MCU:
+- PB10 -> SPI2_SCK, Connected to MAG_SPC/SCL
+- PC3 -> SPI2_MOSI, Connected to MAG_SDO/SDA
+- PB2 -> SPI2_CS, Connect to MAG_CS
+
 ## Communication Protocol
 IIS2MDC Magnetometer is capable of both Serial Peripheral Interface (SPI) and Inter-Intergrated Communication (I2C) serial communication protocols.
 
