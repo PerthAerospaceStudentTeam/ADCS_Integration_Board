@@ -92,7 +92,7 @@ int32_t lsm6dso_write(void *handle, uint8_t reg,
     HAL_GPIO_WritePin(GPIOB, GPIO_PIN_4, GPIO_PIN_RESET); // CS Low
 
     /* write register address to peripheral */
-    int32_t write_status = HAL_SPI_Transmit(&hspi1, &reg, 1, 100)
+    int32_t write_status = HAL_SPI_Transmit(&hspi1, &reg, 1, 100);
 
     /* only attempt to write data to peripheral if register write was successful */
     if (write_status == COMMUNICATION_SUCCESS) {
@@ -913,13 +913,13 @@ static void MX_GPIO_Init(void)
   __HAL_RCC_GPIOB_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_2, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(MAG_CS_GPIO_Port, MAG_CS_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_4, GPIO_PIN_SET);
+  HAL_GPIO_WritePin(IMU_CS_GPIO_Port, IMU_CS_Pin, GPIO_PIN_SET);
 
-  /*Configure GPIO pins : PB2 PB4 */
-  GPIO_InitStruct.Pin = GPIO_PIN_2|GPIO_PIN_4;
+  /*Configure GPIO pins : MAG_CS_Pin IMU_CS_Pin */
+  GPIO_InitStruct.Pin = MAG_CS_Pin|IMU_CS_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
