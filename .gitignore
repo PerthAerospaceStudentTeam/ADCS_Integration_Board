@@ -9,6 +9,9 @@ target/
 *.d
 *.o
 *.su
+*.elf
+*.list
+*.map
 
 # Dependency Directories
 node_modules/
