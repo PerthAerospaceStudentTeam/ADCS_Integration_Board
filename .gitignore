@@ -1,11 +1,14 @@
-# .gitignore file used for the ADCS Integration board repository
-# (heavily based on the Software-orientation, GitHub Standards slide)
+# .gitignore file for the ADCS Integration Board repository
 
 # Build Artifacts
 build/
 dist/
 out/
 target/
+*.cyclo
+*.d
+*.o
+*.su
 
 # Dependency Directories
 node_modules/
@@ -25,8 +28,3 @@ logs/
 # Environment Files
 .env
 .env.local
-
-# Debug Output files
-Debug/*.list
-Debug/*.map
-Debug/*.elf
