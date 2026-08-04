@@ -125,39 +125,42 @@ int32_t lsm6dso_read(void* handle, uint8_t reg, uint8_t* bufp, uint16_t len) {
 }
 
 // IIS2MDC SPI2, CS = PB2
-int32_t mag_platform_write(void* handle, uint8_t reg, const uint8_t* bufp,
-                           uint16_t len) {
-  reg &= 0x7F;
-  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_2, GPIO_PIN_RESET);
+int32_t iis2mdc_write(void* handle, uint8_t reg, const uint8_t* bufp,
+                      uint16_t len) {
+  int32_t write_status = COMMUNICATION_ERROR;
 
-  /* write the register address to peripheral device */
-  int32_t write_status = HAL_SPI_Transmit(&hspi2, &reg, 1, HAL_MAX_DELAY);
+  // Set CS = LOW to start communication
+  HAL_GPIO_WritePin(MAG_CS_GPIO_Port, MAG_CS_Pin, GPIO_PIN_RESET);
 
-  /* only attempt to write data to peripheral if register write was successful */
+  // Attempt SPI write
+  reg &= 0x7F; // Set bit-0 = LOW for write
+  write_status = HAL_SPI_Transmit(&hspi2, &reg, 1, HAL_MAX_DELAY);
   if (write_status == COMMUNICATION_SUCCESS) {
     write_status = HAL_SPI_Transmit(&hspi2, (uint8_t*) bufp, len,
-    HAL_MAX_DELAY);
+                                    HAL_MAX_DELAY);
   }
 
-  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_2, GPIO_PIN_SET);
+  // Set CS = HIGH to end communication
+  HAL_GPIO_WritePin(MAG_CS_GPIO_Port, MAG_CS_Pin, GPIO_PIN_SET);
   return write_status;
 }
 
-int32_t mag_platform_read(void* handle, uint8_t reg, uint8_t* bufp,
-                          uint16_t len) {
+int32_t iis2mcd_read(void* handle, uint8_t reg, uint8_t* bufp, uint16_t len) {
+  int32_t read_status = COMMUNICATION_ERROR;
+
+  // Set CS = LOW to start communication
+  HAL_GPIO_WritePin(MAG_CS_GPIO_Port, MAG_CS_Pin, GPIO_PIN_RESET);
+
+  // Attempt SPI read
   reg |= 0x80;
-  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_2, GPIO_PIN_RESET);
-
-  /* write address of register to peripheral device */
-  int32_t comm_status = HAL_SPI_Transmit(&hspi2, &reg, 1, HAL_MAX_DELAY);
-
-  /* only attempt to read data from peripheral device if register write to device was successful */
-  if (comm_status == COMMUNICATION_SUCCESS) {
-    comm_status = HAL_SPI_Receive(&hspi2, bufp, len, HAL_MAX_DELAY);
+  read_status = HAL_SPI_Transmit(&hspi2, &reg, 1, HAL_MAX_DELAY);
+  if (read_status == COMMUNICATION_SUCCESS) {
+    read_status = HAL_SPI_Receive(&hspi2, bufp, len, HAL_MAX_DELAY);
   }
 
-  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_2, GPIO_PIN_SET);
-  return comm_status;
+  // Set CS = HIGH to end communication
+  HAL_GPIO_WritePin(MAG_CS_GPIO_Port, MAG_CS_Pin, GPIO_PIN_SET);
+  return read_status;
 }
 
 /* Conversion helper */
@@ -186,7 +189,7 @@ void resetCalibration() {
   }
   char SUN_Calibration[] = "Calibration Of ADC Sun Sensors";
   HAL_UART_Transmit(&huart1, (uint8_t*) SUN_Calibration,
-          strlen(SUN_Calibration), 100);
+                    strlen(SUN_Calibration), 100);
 }
 
 /* USER CODE END 0 */
@@ -236,8 +239,8 @@ int main(void) {
   lsm6dso_ctx.handle = &hspi1;
 
   // IIS2MDC initialize
-  iis2mdc_ctx.write_reg = mag_platform_write;
-  iis2mdc_ctx.read_reg = mag_platform_read;
+  iis2mdc_ctx.write_reg = iis2mdc_write;
+  iis2mdc_ctx.read_reg = iis2mcd_read;
   iis2mdc_ctx.handle = &hspi2;
 
   /* -------- LSM6DSO INIT -------- */
