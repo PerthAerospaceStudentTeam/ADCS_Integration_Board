@@ -32,8 +32,8 @@ const static Fixed_Bias mag_fixed_bias = {PLACEHOLDER_BIAS, PLACEHOLDER_BIAS, PL
 * Imports enum type indicating which sensor raw data is from
 * Returns int pointer (int array of length 3) containg raw data with removed biases (chosen as opposed to updating raw data itself for testing)
 */
-int* filter_fixed_bias(int* raw_data, Sensor_Type data_source) {
-	int filtered_data[3];
+int16_t* filter_fixed_bias(int16_t* raw_data, Sensor_Type data_source) {
+	int16_t filtered_data[3];
 
 	/* apply bias removal based on source of raw data */
 	switch(data_source) {
@@ -55,4 +55,36 @@ int* filter_fixed_bias(int* raw_data, Sensor_Type data_source) {
 	}
 
 	return filtered_data;
+}
+
+/*
+* Following set of functions aims to implement the 3 algorithms used in state prediction Kalman filtering algorithm
+*/
+
+/*
+* Algorithm to calculate the Kalman gain, (determines the 'strength' given to new measurements)
+* imports: p (representing extrapolated variance estimation), r (representing variance in current measurement)
+* exports: new value of kalman gain (K), 0.0 <= K <= 1.0
+ */
+double calculate_kalman_gain(int16_t p, int16_t r) {
+	//Kalman-Gain = variance_in_estimation / (variance_in_estimation + variance_in_measurement)
+	return ( (double)p / ( (double)p + (double)r ) );
+}
+
+/*
+* Algorithm to calculate variance_in_estimation (p), determines the variance in current state prediction from prev.
+* imports: k (representing kalman gain), p (previous variance_in_estimation)
+* exports: new value for variance_in_estimation
+*/
+int16_t calculate_estimate_variation(double k, int16_t p) {
+	return ( (1.0 - k) * (double)p ); //Very likely issue with type conversion here
+}
+
+/*
+* Algorithm to calculate current state_estimation, actually
+* imports: x (Previous state_estimation), k (kalman gain), z (variance in curr measurement)
+* exports: current estimation for state (i.e. filtered measurement for sensor reading)
+*/
+int16_t calculate_state_estimation(int16_t x, double k, int16_t z) {
+	return ( x + k * (z - x) ); //Very likely issue with type conversion here
 }
