@@ -21,10 +21,32 @@ typedef struct {
 	int16_t z;
 } Fixed_Bias;
 
+
+/* UNSURE if this will be final implementation, may hopefully figure out how to optomise in future (i.e. requires less struct instances) */
+
+/* Struct used to maintain variables required for state prediction algorithm */
+typedef struct {
+	double kalman_gain;
+	int16_t estimation_variation;
+	int16_t state_estimation;
+} State_Prediction_Variables;
+
+/* Struct used to store variables required to filter each reading from IMU && MAG */
+typedef struct {
+	State_Prediction_Variables x;
+	State_Prediction_Variables y;
+	State_Prediction_Variables z;
+} Sensor_Reading_Filtering;
+
 /* Will update each struct instance to contain appropriate value when able */
 const static Fixed_Bias accel_fixed_bias = {PLACEHOLDER_BIAS, PLACEHOLDER_BIAS, PLACEHOLDER_BIAS};
 const static Fixed_Bias gyro_fixed_bias = {PLACEHOLDER_BIAS, PLACEHOLDER_BIAS, PLACEHOLDER_BIAS};
 const static Fixed_Bias mag_fixed_bias = {PLACEHOLDER_BIAS, PLACEHOLDER_BIAS, PLACEHOLDER_BIAS};
+
+/* Store variables required to complete state prediction filtering algorithms for each sensor measurement */
+Sensor_Reading_Filtering accel_filtered_state = { {0.0, 0, 0}, {0.0, 0, 0}, {0.0, 0, 0} };
+Sensor_Reading_Filtering gyro_filtered_state = { {0.0, 0, 0}, {0.0, 0, 0}, {0.0, 0, 0} };
+Sensor_Reading_Filtering mag_filtered_state = { {0.0, 0, 0}, {0.0, 0, 0}, {0.0, 0, 0} };
 
 /*
 * Function to filter fixed bias from raw sensor readings
@@ -59,6 +81,7 @@ int16_t* filter_fixed_bias(int16_t* raw_data, Sensor_Type data_source) {
 
 /*
 * Following set of functions aims to implement the 3 algorithms used in state prediction Kalman filtering algorithm
+* Heavily based on algorithms found at: https://kalmanfilter.net/kalman1d.html
 */
 
 /*
@@ -77,14 +100,31 @@ double calculate_kalman_gain(int16_t p, int16_t r) {
 * exports: new value for variance_in_estimation
 */
 int16_t calculate_estimate_variation(double k, int16_t p) {
-	return ( (1.0 - k) * (double)p ); //Very likely issue with type conversion here
+	return (int16_t)( (1.0 - k) * (double)p );
 }
 
 /*
 * Algorithm to calculate current state_estimation, actually
-* imports: x (Previous state_estimation), k (kalman gain), z (variance in curr measurement)
+* imports: x (Previous state_estimation), k (kalman gain), z (measured system state)
 * exports: current estimation for state (i.e. filtered measurement for sensor reading)
 */
 int16_t calculate_state_estimation(int16_t x, double k, int16_t z) {
-	return ( x + k * (z - x) ); //Very likely issue with type conversion here
+	return (int16_t)( (double)x + k * (double)(z - x) );
+}
+
+/*
+* Function used to combine kalman state estimation filtering algorithms into single filtering operation for a single data reading
+* imports data (new measurement to be filtered), state_predict_vars (reference to struct containing appropriate variables to apply state prediction)
+* Updates values stored within state_predict_vars to reflect new state prediction variables (state_predict_vars->state_estimation is filtered data)
+*/
+void predict_system_state(int16_t data, State_Prediction_Variables* state_predict_vars) {
+	int16_t measurement_variance;
+	
+	// calculate variance in current measurement from estimated state
+	measurement_variance = ( data - state_predict_vars->state_estimation );
+
+	//apply state estimation algorithms in order
+	state_predict_vars->kalman_gain = calculate_kalman_gain(state_predict_vars->estimation_variation, measurement_variance);
+	state_predict_vars->estimation_variation = calculate_estimate_variation(state_predict_vars->kalman_gain, state_predict_vars->estimation_variation);
+	state_predict_vars->state_estimation = calculate_state_estimation(state_predict_vars->state_estimation, state_predict_vars->kalman_gain, data);
 }
