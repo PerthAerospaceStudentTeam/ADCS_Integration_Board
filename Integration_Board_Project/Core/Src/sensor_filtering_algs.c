@@ -4,6 +4,8 @@
  * Approach to sensor filtering:
  * 	->Raw sensor has initIal fixed bias removed, simply: filtered = raw - <calculated/tested fixed bias>
  * 	->Apply Kalman Filtering (or a modified form) to handle instability/stability biases resulting from runtime-based, unpredictable external factors (i.e. Temperature/EMI)
+ * 
+ * Filtering functions currently return arrays of filtered data, this approach is likely temporary, and is mainly for testing (allows for both the raw and filtered data to be compared)
 */
 
 
@@ -89,7 +91,7 @@ int16_t* filter_fixed_bias(int16_t* raw_data, Sensor_Type data_source) {
 * imports: p (representing extrapolated variance estimation), r (representing variance in current measurement)
 * exports: new value of kalman gain (K), 0.0 <= K <= 1.0
  */
-double calculate_kalman_gain(int16_t p, int16_t r) {
+static double calculate_kalman_gain(int16_t p, int16_t r) {
 	//Kalman-Gain = variance_in_estimation / (variance_in_estimation + variance_in_measurement)
 	return ( (double)p / ( (double)p + (double)r ) );
 }
@@ -99,7 +101,7 @@ double calculate_kalman_gain(int16_t p, int16_t r) {
 * imports: k (representing kalman gain), p (previous variance_in_estimation)
 * exports: new value for variance_in_estimation
 */
-int16_t calculate_estimate_variation(double k, int16_t p) {
+static int16_t calculate_estimate_variation(double k, int16_t p) {
 	return (int16_t)( (1.0 - k) * (double)p );
 }
 
@@ -108,7 +110,7 @@ int16_t calculate_estimate_variation(double k, int16_t p) {
 * imports: x (Previous state_estimation), k (kalman gain), z (measured system state)
 * exports: current estimation for state (i.e. filtered measurement for sensor reading)
 */
-int16_t calculate_state_estimation(int16_t x, double k, int16_t z) {
+static int16_t calculate_state_estimation(int16_t x, double k, int16_t z) {
 	return (int16_t)( (double)x + k * (double)(z - x) );
 }
 
@@ -116,8 +118,9 @@ int16_t calculate_state_estimation(int16_t x, double k, int16_t z) {
 * Function used to combine kalman state estimation filtering algorithms into single filtering operation for a single data reading
 * imports data (new measurement to be filtered), state_predict_vars (reference to struct containing appropriate variables to apply state prediction)
 * Updates values stored within state_predict_vars to reflect new state prediction variables (state_predict_vars->state_estimation is filtered data)
+* Exports: value of state_predict_vars->state_estimation after prediction occurs
 */
-void predict_system_state(int16_t data, State_Prediction_Variables* state_predict_vars) {
+int16_t predict_system_state(int16_t data, State_Prediction_Variables* state_predict_vars) {
 	int16_t measurement_variance;
 	
 	// calculate variance in current measurement from estimated state
@@ -127,4 +130,51 @@ void predict_system_state(int16_t data, State_Prediction_Variables* state_predic
 	state_predict_vars->kalman_gain = calculate_kalman_gain(state_predict_vars->estimation_variation, measurement_variance);
 	state_predict_vars->estimation_variation = calculate_estimate_variation(state_predict_vars->kalman_gain, state_predict_vars->estimation_variation);
 	state_predict_vars->state_estimation = calculate_state_estimation(state_predict_vars->state_estimation, state_predict_vars->kalman_gain, data);
+
+	return state_predict_vars->state_estimation;
+}
+
+/*
+* Function to apply kalman state estimation filtering for x, y, z readings from sensor
+* imports data (1D Array of 3 ints represnting data to be filtered), data_source (used to apply and update correct state prediction variables)
+* Exports: 1d array of 3 ints representing new data after filtering (system state representing data has been predicted)
+*/
+int16_t* kalman_state_estimation(int16_t* data, Sensor_Type data_source) {
+	int16_t predicted_states[3];
+
+	//filter data using appropriate state-estimation variables determined on source of data
+	switch(data_source) {
+		case ACCELEROMETER:
+			predicted_states[0] = predict_system_state(data[0], &(accel_filtered_state.x)); // x
+			predicted_states[1] = predict_system_state(data[1], &(accel_filtered_state.x)); // y
+			predicted_states[2] = predict_system_state(data[2], &(accel_filtered_state.x)); // z
+			break;
+		case GYROSCOPE:
+			predicted_states[0] = predict_system_state(data[0], &(gyro_filtered_state.x)); // x
+			predicted_states[1] = predict_system_state(data[1], &(gyro_filtered_state.x)); // y
+			predicted_states[2] = predict_system_state(data[2], &(gyro_filtered_state.x)); // z
+			break;
+		case MAGNETOMETER:
+			predicted_states[0] = predict_system_state(data[0], &(mag_filtered_state.x)); // x
+			predicted_states[1] = predict_system_state(data[1], &(mag_filtered_state.x)); // y
+			predicted_states[2] = predict_system_state(data[2], &(mag_filtered_state.x)); // z
+			break;
+	}
+
+	return predicted_states;
+}
+
+/*
+* Function used to filter x, y, z data from a particular sensor
+* Imports: raw_data (1D Array of 3 ints represnting data to be filtered), data_source (used to apply and update correct state prediction variables)
+* Exports: 1d array of 3 ints representing new data after filtering
+*/
+int16_t* filter_sensor_data(int16_t* raw_data, Sensor_Type data_source) {
+	int16_t filtered_data;
+
+	//First filter fixed biases from readings, then apply kalman filtering
+	filtered_data = filter_fixed_bias(raw_data, data_source);
+	filtered_data = kalman_state_estimation(filtered_data, data_source);
+
+	return filtered_data;
 }

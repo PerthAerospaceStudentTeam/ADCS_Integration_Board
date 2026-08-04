@@ -16,8 +16,13 @@
 
 
 	/* Function declarations */
-	int* filter_fixed_bias(int* raw_data, Sensor_Type data_source);
+	int16_t* filter_fixed_bias(int16_t* raw_data, Sensor_Type data_source);
+	int16_t* kalman_state_estimation(int16_t* data, Sensor_Type data_source);
+	int16_t* filter_sensor_data(int16_t* raw_data, Sensor_Type data_source);
 
+	/* only included here for basic testing if needed, will likely be removed soon */
+	int16_t predict_system_state(int16_t data, State_Prediction_Variables* state_predict_vars);
+	
 	#ifdef __cplusplus
 	}
 	#endif
