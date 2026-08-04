@@ -1,9 +1,9 @@
 /* USER CODE BEGIN Header */
 /**
- ******************************************************************************
+ *****************************************************************************
  * @file           : main.c
  * @brief          : Main program body
- ******************************************************************************
+ *****************************************************************************
  * @attention
  *
  * Copyright (c) 2026 STMicroelectronics.
@@ -16,10 +16,10 @@
  ******************************************************************************
  */
 /* USER CODE END Header */
-/* Includes ------------------------------------------------------------------*/
+/* Includes ----------------------------------------------------------------*/
 #include "main.h"
 
-/* Private includes ----------------------------------------------------------*/
+/* Private includes --------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include <stdio.h>
 #include <string.h>
@@ -29,22 +29,22 @@
 #include "iis2mdc_reg.h"
 /* USER CODE END Includes */
 
-/* Private typedef -----------------------------------------------------------*/
+/* Private typedef ---------------------------------------------------------*/
 /* USER CODE BEGIN PTD */
 
 /* USER CODE END PTD */
 
-/* Private define ------------------------------------------------------------*/
+/* Private define ----------------------------------------------------------*/
 /* USER CODE BEGIN PD */
 
 /* USER CODE END PD */
 
-/* Private macro -------------------------------------------------------------*/
+/* Private macro -----------------------------------------------------------*/
 /* USER CODE BEGIN PM */
 
 /* USER CODE END PM */
 
-/* Private variables ---------------------------------------------------------*/
+/* Private variables -------------------------------------------------------*/
 ADC_HandleTypeDef hadc1;
 DMA_HandleTypeDef hdma_adc1;
 
@@ -60,7 +60,7 @@ UART_HandleTypeDef huart1;
 
 /* USER CODE END PV */
 
-/* Private function prototypes -----------------------------------------------*/
+/* Private function prototypes ---------------------------------------------*/
 void SystemClock_Config(void);
 static void MPU_Config(void);
 static void MX_GPIO_Init(void);
@@ -75,20 +75,24 @@ static void MX_ADC1_Init(void);
 
 /* USER CODE END PFP */
 
-/* Private user code ---------------------------------------------------------*/
+/* Private user code -------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
 
 stmdev_ctx_t lsm6dso_ctx;
 stmdev_ctx_t iis2mdc_ctx;
 
-/* COMMUNICATION FUNCTIONS
- * Functions should not handle failed write operation itself (i.e. loop until success), this should be responsibility of calling function
- * All possible return values of functions correspond to COMMUNICATION_... macros defined in main.h
+/* ---------------------- COMMUNICATION FUNCTIONS ----------------------------
+ * Functions should not handle failed write operation itself (i.e. loop until
+ * success), this should be responsibility of calling function. All possible
+ * return values of functions correspond to COMMUNICATION_... macros defined
+ * in main.h
  */
 
-// LSM6DSO = SPI1, CS = PB4
-int32_t lsm6dso_write(void* handle, uint8_t reg, const uint8_t* bufp,
-                      uint16_t len) {
+/* ---------------------------- LSM6DSO IMU ----------------------------------
+ * Notes: LSM6DSO using SPI1, CS = PB4
+ */
+int32_t IMU_Write(void* handle, uint8_t reg, const uint8_t* bufp,
+                  uint16_t len) {
   int32_t write_status = COMMUNICATION_ERROR;
 
   // Set CS = LOW to start communication
@@ -106,7 +110,7 @@ int32_t lsm6dso_write(void* handle, uint8_t reg, const uint8_t* bufp,
   return write_status;
 }
 
-int32_t lsm6dso_read(void* handle, uint8_t reg, uint8_t* bufp, uint16_t len) {
+int32_t IMU_Read(void* handle, uint8_t reg, uint8_t* bufp, uint16_t len) {
   int32_t read_status = COMMUNICATION_ERROR;
 
   // Set CS = LOW to start communication
@@ -124,8 +128,10 @@ int32_t lsm6dso_read(void* handle, uint8_t reg, uint8_t* bufp, uint16_t len) {
   return read_status;
 }
 
-// IIS2MDC SPI2, CS = PB2
-int32_t iis2mdc_write(void* handle, uint8_t reg, const uint8_t* bufp,
+/* ---------------------------- IIS2MDC MAG ----------------------------------
+ * Notes: IIS2MDC using SPI2, CS = PB2
+ */
+int32_t MAG_Write(void* handle, uint8_t reg, const uint8_t* bufp,
                       uint16_t len) {
   int32_t write_status = COMMUNICATION_ERROR;
 
@@ -145,7 +151,7 @@ int32_t iis2mdc_write(void* handle, uint8_t reg, const uint8_t* bufp,
   return write_status;
 }
 
-int32_t iis2mcd_read(void* handle, uint8_t reg, uint8_t* bufp, uint16_t len) {
+int32_t MAG_Read(void* handle, uint8_t reg, uint8_t* bufp, uint16_t len) {
   int32_t read_status = COMMUNICATION_ERROR;
 
   // Set CS = LOW to start communication
@@ -165,7 +171,7 @@ int32_t iis2mcd_read(void* handle, uint8_t reg, uint8_t* bufp, uint16_t len) {
 
 /* Conversion helper */
 float raw_accel_to_mss(int16_t raw) {
-  return (float) raw * 0.00059f; //conversion found in data sheet says 0.00061 but it overshoots...
+  return (float) raw * 0.00059f; //Data sheet conversion of 0.00061 overshoots
 }
 
 float raw_gyro_to_degreespersecond(int16_t raw) {
@@ -234,17 +240,16 @@ int main(void) {
   MX_ADC1_Init();
   /* USER CODE BEGIN 2 */
   // LSM6DSO initialize
-  lsm6dso_ctx.write_reg = lsm6dso_write;
-  lsm6dso_ctx.read_reg = lsm6dso_read;
+  lsm6dso_ctx.write_reg = IMU_Write;
+  lsm6dso_ctx.read_reg = IMU_Read;
   lsm6dso_ctx.handle = &hspi1;
 
   // IIS2MDC initialize
-  iis2mdc_ctx.write_reg = iis2mdc_write;
-  iis2mdc_ctx.read_reg = iis2mcd_read;
+  iis2mdc_ctx.write_reg = MAG_Write;
+  iis2mdc_ctx.read_reg = MAG_Read;
   iis2mdc_ctx.handle = &hspi2;
 
   /* -------- LSM6DSO INIT -------- */
-
   lsm6dso_spi_mode_set(&lsm6dso_ctx, LSM6DSO_SPI_3_WIRE); //using the stm32 lsm6dso library and should use this to work with 3 wire mode
   lsm6dso_auto_increment_set(&lsm6dso_ctx, 1);
   lsm6dso_xl_data_rate_set(&lsm6dso_ctx, LSM6DSO_XL_ODR_833Hz);
@@ -258,7 +263,7 @@ int main(void) {
 
   //WHOAMI
   uint8_t VALUE = 0;
-  lsm6dso_read(NULL, 0x0F, &VALUE, 1);
+  IMU_Read(NULL, 0x0F, &VALUE, 1);
 
   //testing to check if i can comm with the imu
   char string[32];
