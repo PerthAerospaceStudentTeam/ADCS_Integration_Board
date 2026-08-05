@@ -7,6 +7,8 @@
 	extern "C" {
 	#endif
 
+	#include <stdint.h>
+
 	/* Define enum used to indicate sensor, used in filtering function to apply correct fixed bias removal */
 	typedef enum {
 		ACCELEROMETER = 0,
@@ -15,14 +17,14 @@
 	} Sensor_Type;
 
 
-	/* Function declarations */
-	int16_t* filter_fixed_bias(int16_t* raw_data, Sensor_Type data_source);
-	int16_t* kalman_state_estimation(int16_t* data, Sensor_Type data_source);
+	/* Function declaration (actual function provided to filter sensor data) */
 	int16_t* filter_sensor_data(int16_t* raw_data, Sensor_Type data_source);
 
-	/* only included here for basic testing if needed, will likely be removed soon */
-	int16_t predict_system_state(int16_t data, State_Prediction_Variables* state_predict_vars);
-	
+	/* Testing functions (these functions are temporarily available to other files to test independently) */
+	int16_t predict_system_state_test(int16_t data, double k, int16_t e, int16_t s);
+	int16_t* filter_fixed_bias(int16_t* raw_data, Sensor_Type data_source);
+	int16_t* kalman_state_estimation(int16_t* data, Sensor_Type data_source);
+
 	#ifdef __cplusplus
 	}
 	#endif

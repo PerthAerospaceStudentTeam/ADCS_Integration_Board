@@ -11,7 +11,6 @@
 
 /* include header files */
 #include "sensor_filtering_algs.h"
-#include <stdint.h>
 
 /* Define Structs containing fixed bias for x+y+z axis on each sensor */
 /* define placeholder until all bias values can be determined */
@@ -58,6 +57,8 @@ static Sensor_Reading_Filtering mag_filtered_state = { {0.0, 0, 0}, {0.0, 0, 0},
 */
 int16_t* filter_fixed_bias(int16_t* raw_data, Sensor_Type data_source) {
 	int16_t filtered_data[3];
+
+	// function is only temporarily visible outside of file for testing
 
 	/* apply bias removal based on source of raw data */
 	switch(data_source) {
@@ -135,6 +136,23 @@ int16_t predict_system_state(int16_t data, State_Prediction_Variables* state_pre
 }
 
 /*
+* Function used to test kalman state estimation filtering algorithm, modified to be used by external files (i.e. does not import struct specific to this file)
+* Imports data (new measurement), k (kalman gain), e (estimation variation), s (state estimation)
+* Exports new data (after filtering applied)
+*/
+int16_t predict_system_state_test(int16_t data, double k, int16_t e, int16_t s) {
+	// This function is only to temporarily exist to allow external files to test exlsuively the kalman filtering function (without fixed bias removal
+	// Function simply calls the predict_system_state function with imported vars
+
+	//create the state_prediction_variables struct
+	State_Prediction_Variables state_predict_vars = { k, e, s };
+
+	// call predict_system_state function and return result
+	return predict_system_state(data, &state_predict_vars);
+
+}
+
+/*
 * Function to apply kalman state estimation filtering for x, y, z readings from sensor
 * imports data (1D Array of 3 ints represnting data to be filtered), data_source (used to apply and update correct state prediction variables)
 * Exports: 1d array of 3 ints representing new data after filtering (system state representing data has been predicted)
@@ -170,7 +188,7 @@ int16_t* kalman_state_estimation(int16_t* data, Sensor_Type data_source) {
 * Exports: 1d array of 3 ints representing new data after filtering
 */
 int16_t* filter_sensor_data(int16_t* raw_data, Sensor_Type data_source) {
-	int16_t filtered_data;
+	int16_t* filtered_data;
 
 	//First filter fixed biases from readings, then apply kalman filtering for instability/stability random biases
 	filtered_data = filter_fixed_bias(raw_data, data_source);
@@ -178,3 +196,5 @@ int16_t* filter_sensor_data(int16_t* raw_data, Sensor_Type data_source) {
 
 	return filtered_data;
 }
+
+// I am aware of warnings with returning filtered data, will likely remove the returns soon, replacing with modifying original passed data
