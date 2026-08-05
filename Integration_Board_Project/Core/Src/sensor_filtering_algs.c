@@ -46,9 +46,9 @@ const static Fixed_Bias gyro_fixed_bias = {PLACEHOLDER_BIAS, PLACEHOLDER_BIAS, P
 const static Fixed_Bias mag_fixed_bias = {PLACEHOLDER_BIAS, PLACEHOLDER_BIAS, PLACEHOLDER_BIAS};
 
 /* Store variables required to complete state prediction filtering algorithms for each sensor measurement */
-Sensor_Reading_Filtering accel_filtered_state = { {0.0, 0, 0}, {0.0, 0, 0}, {0.0, 0, 0} };
-Sensor_Reading_Filtering gyro_filtered_state = { {0.0, 0, 0}, {0.0, 0, 0}, {0.0, 0, 0} };
-Sensor_Reading_Filtering mag_filtered_state = { {0.0, 0, 0}, {0.0, 0, 0}, {0.0, 0, 0} };
+static Sensor_Reading_Filtering accel_filtered_state = { {0.0, 0, 0}, {0.0, 0, 0}, {0.0, 0, 0} };
+static Sensor_Reading_Filtering gyro_filtered_state = { {0.0, 0, 0}, {0.0, 0, 0}, {0.0, 0, 0} };
+static Sensor_Reading_Filtering mag_filtered_state = { {0.0, 0, 0}, {0.0, 0, 0}, {0.0, 0, 0} };
 
 /*
 * Function to filter fixed bias from raw sensor readings
@@ -126,7 +126,7 @@ int16_t predict_system_state(int16_t data, State_Prediction_Variables* state_pre
 	// calculate variance in current measurement from estimated state
 	measurement_variance = ( data - state_predict_vars->state_estimation );
 
-	//apply state estimation algorithms in order
+	//apply state estimation algorithms in order (kalman->estimate_variation->state_estimation)
 	state_predict_vars->kalman_gain = calculate_kalman_gain(state_predict_vars->estimation_variation, measurement_variance);
 	state_predict_vars->estimation_variation = calculate_estimate_variation(state_predict_vars->kalman_gain, state_predict_vars->estimation_variation);
 	state_predict_vars->state_estimation = calculate_state_estimation(state_predict_vars->state_estimation, state_predict_vars->kalman_gain, data);
@@ -146,18 +146,18 @@ int16_t* kalman_state_estimation(int16_t* data, Sensor_Type data_source) {
 	switch(data_source) {
 		case ACCELEROMETER:
 			predicted_states[0] = predict_system_state(data[0], &(accel_filtered_state.x)); // x
-			predicted_states[1] = predict_system_state(data[1], &(accel_filtered_state.x)); // y
-			predicted_states[2] = predict_system_state(data[2], &(accel_filtered_state.x)); // z
+			predicted_states[1] = predict_system_state(data[1], &(accel_filtered_state.y)); // y
+			predicted_states[2] = predict_system_state(data[2], &(accel_filtered_state.z)); // z
 			break;
 		case GYROSCOPE:
 			predicted_states[0] = predict_system_state(data[0], &(gyro_filtered_state.x)); // x
-			predicted_states[1] = predict_system_state(data[1], &(gyro_filtered_state.x)); // y
-			predicted_states[2] = predict_system_state(data[2], &(gyro_filtered_state.x)); // z
+			predicted_states[1] = predict_system_state(data[1], &(gyro_filtered_state.y)); // y
+			predicted_states[2] = predict_system_state(data[2], &(gyro_filtered_state.z)); // z
 			break;
 		case MAGNETOMETER:
 			predicted_states[0] = predict_system_state(data[0], &(mag_filtered_state.x)); // x
-			predicted_states[1] = predict_system_state(data[1], &(mag_filtered_state.x)); // y
-			predicted_states[2] = predict_system_state(data[2], &(mag_filtered_state.x)); // z
+			predicted_states[1] = predict_system_state(data[1], &(mag_filtered_state.y)); // y
+			predicted_states[2] = predict_system_state(data[2], &(mag_filtered_state.z)); // z
 			break;
 	}
 
@@ -172,7 +172,7 @@ int16_t* kalman_state_estimation(int16_t* data, Sensor_Type data_source) {
 int16_t* filter_sensor_data(int16_t* raw_data, Sensor_Type data_source) {
 	int16_t filtered_data;
 
-	//First filter fixed biases from readings, then apply kalman filtering
+	//First filter fixed biases from readings, then apply kalman filtering for instability/stability random biases
 	filtered_data = filter_fixed_bias(raw_data, data_source);
 	filtered_data = kalman_state_estimation(filtered_data, data_source);
 
