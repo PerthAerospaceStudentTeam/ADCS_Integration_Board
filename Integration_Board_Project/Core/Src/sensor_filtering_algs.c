@@ -51,35 +51,32 @@ static Sensor_Reading_Filtering mag_filtered_state = { {0.0, 0, 0}, {0.0, 0, 0},
 
 /*
 * Function to filter fixed bias from raw sensor readings
-* Imports reference to int pointer (expects array of length 3, [0]=x, [1]=y, [2]=z)
+* Imports reference to int array (expects array of length 3, [0]=x, [1]=y, [2]=z)
 * Imports enum type indicating which sensor raw data is from
-* Returns int pointer (int array of length 3) containg raw data with removed biases (chosen as opposed to updating raw data itself for testing)
+* Updates imported data to filtered version of data
 */
-int16_t* filter_fixed_bias(int16_t* raw_data, Sensor_Type data_source) {
-	int16_t filtered_data[3];
+void filter_fixed_bias(int16_t data[3], Sensor_Type data_source) {
 
 	// function is only temporarily visible outside of file for testing
 
 	/* apply bias removal based on source of raw data */
 	switch(data_source) {
 		case ACCELEROMETER:
-			filtered_data[0] = raw_data[0] - accel_fixed_bias.x; 
-			filtered_data[1] = raw_data[1] - accel_fixed_bias.y;
-			filtered_data[2] = raw_data[2] - accel_fixed_bias.z;
+			data[0] -= accel_fixed_bias.x; 
+			data[0] -= accel_fixed_bias.y; 
+			data[0] -= accel_fixed_bias.z; 
 			break;
 		case GYROSCOPE:
-			filtered_data[0] = raw_data[0] - gyro_fixed_bias.x; 
-			filtered_data[1] = raw_data[1] - gyro_fixed_bias.y;
-			filtered_data[2] = raw_data[2] - gyro_fixed_bias.z;
+			data[0] -= gyro_fixed_bias.x; 
+			data[0] -= gyro_fixed_bias.y; 
+			data[0] -= gyro_fixed_bias.z; 
 			break;
 		case MAGNETOMETER:
-			filtered_data[0] = raw_data[0] - mag_fixed_bias.x; 
-			filtered_data[1] = raw_data[1] - mag_fixed_bias.y;
-			filtered_data[2] = raw_data[2] - mag_fixed_bias.z;
+			data[0] -= mag_fixed_bias.x; 
+			data[0] -= mag_fixed_bias.y; 
+			data[0] -= mag_fixed_bias.z; 
 			break;
 	}
-
-	return filtered_data;
 }
 
 /*
@@ -155,46 +152,37 @@ int16_t predict_system_state_test(int16_t data, double k, int16_t e, int16_t s) 
 /*
 * Function to apply kalman state estimation filtering for x, y, z readings from sensor
 * imports data (1D Array of 3 ints represnting data to be filtered), data_source (used to apply and update correct state prediction variables)
-* Exports: 1d array of 3 ints representing new data after filtering (system state representing data has been predicted)
+* updates each value in imported array to reflect predicted state for that value after kalman state estimation function applied
 */
-int16_t* kalman_state_estimation(int16_t* data, Sensor_Type data_source) {
-	int16_t predicted_states[3];
+void kalman_state_estimation(int16_t data[3], Sensor_Type data_source) {
 
 	//filter data using appropriate state-estimation variables determined on source of data
 	switch(data_source) {
 		case ACCELEROMETER:
-			predicted_states[0] = predict_system_state(data[0], &(accel_filtered_state.x)); // x
-			predicted_states[1] = predict_system_state(data[1], &(accel_filtered_state.y)); // y
-			predicted_states[2] = predict_system_state(data[2], &(accel_filtered_state.z)); // z
+			data[0] = predict_system_state(data[0], &(accel_filtered_state.x)); // x
+			data[1] = predict_system_state(data[1], &(accel_filtered_state.y)); // y
+			data[2] = predict_system_state(data[2], &(accel_filtered_state.z)); // z
 			break;
 		case GYROSCOPE:
-			predicted_states[0] = predict_system_state(data[0], &(gyro_filtered_state.x)); // x
-			predicted_states[1] = predict_system_state(data[1], &(gyro_filtered_state.y)); // y
-			predicted_states[2] = predict_system_state(data[2], &(gyro_filtered_state.z)); // z
+			data[0] = predict_system_state(data[0], &(gyro_filtered_state.x)); // x
+			data[1] = predict_system_state(data[1], &(gyro_filtered_state.y)); // y
+			data[2] = predict_system_state(data[2], &(gyro_filtered_state.z)); // z
 			break;
 		case MAGNETOMETER:
-			predicted_states[0] = predict_system_state(data[0], &(mag_filtered_state.x)); // x
-			predicted_states[1] = predict_system_state(data[1], &(mag_filtered_state.y)); // y
-			predicted_states[2] = predict_system_state(data[2], &(mag_filtered_state.z)); // z
+			data[0] = predict_system_state(data[0], &(mag_filtered_state.x)); // x
+			data[1] = predict_system_state(data[1], &(mag_filtered_state.y)); // y
+			data[2] = predict_system_state(data[2], &(mag_filtered_state.z)); // z
 			break;
 	}
-
-	return predicted_states;
 }
 
 /*
 * Function used to filter x, y, z data from a particular sensor
-* Imports: raw_data (1D Array of 3 ints represnting data to be filtered), data_source (used to apply and update correct state prediction variables)
-* Exports: 1d array of 3 ints representing new data after filtering
+* Imports: data (1D Array of 3 ints represnting data to be filtered), data_source (used to apply and update correct state prediction variables)
+* Updates imported data so that values stored in array represent new, filtered data fater fixed bias and instability/stability biases are removed
 */
-int16_t* filter_sensor_data(int16_t* raw_data, Sensor_Type data_source) {
-	int16_t* filtered_data;
-
+void filter_sensor_data(int16_t data[3], Sensor_Type data_source) {
 	//First filter fixed biases from readings, then apply kalman filtering for instability/stability random biases
-	filtered_data = filter_fixed_bias(raw_data, data_source);
-	filtered_data = kalman_state_estimation(filtered_data, data_source);
-
-	return filtered_data;
+	filter_fixed_bias(data, data_source);
+	kalman_state_estimation(data, data_source);
 }
-
-// I am aware of warnings with returning filtered data, will likely remove the returns soon, replacing with modifying original passed data
