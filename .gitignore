@@ -1,10 +1,10 @@
 # .gitignore file for the ADCS Integration Board repository
 
+# Build Targets
+*/Debug
+*/Release
+
 # Build Artifacts
-build/
-dist/
-out/
-target/
 *.cyclo
 *.d
 *.o
