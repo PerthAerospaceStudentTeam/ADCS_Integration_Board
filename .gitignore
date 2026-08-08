@@ -3,6 +3,7 @@
 # Build Configurations
 */Debug
 */Release
+*/compiledb
 
 # Build Artifacts
 *.cyclo
@@ -12,6 +13,7 @@
 *.elf
 *.list
 *.map
+*.mk
 
 # clang/d Files
 *.cache
