@@ -1,6 +1,6 @@
 # .gitignore file for the ADCS Integration Board repository
 
-# Build Targets
+# Build Configurations
 */Debug
 */Release
 
@@ -12,6 +12,10 @@
 *.elf
 *.list
 *.map
+
+# clang/d Files
+*.cache
+compile_commands.json
 
 # Dependency Directories
 node_modules/
