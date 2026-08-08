@@ -25,9 +25,15 @@ Integration_Board_Project directory acts as the primary codebase of the reposito
 ## Contributing
 - Jayden Z
 - Aiden H
+- Michael W
 - Bodhi B
 - Luke L
 
 ## Contact
 
+
 ## License
+- Project's usage of STM32CubeIDE is licensed under: [license](https://www.st.com/sla0048)
+- Project's usage of IIS2MDC Driver code is licensed under: [license](https://github.com/STMicroelectronics/iis2mdc-pid/blob/master/LICENSE)
+- Project's usage of LSM6DSOTR Driver code is licensed under: [license](https://github.com/STMicroelectronics/stm32-lsm6dso/blob/main/LICENSE.md)
+- Project's usage of stm32h7xx_hal code is licensed under: [license](https://github.com/Selectronic-AU/stm32h7xx_hal_driver/blob/master/LICENSE.md)  
