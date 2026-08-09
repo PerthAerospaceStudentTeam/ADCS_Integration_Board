@@ -137,15 +137,17 @@ int16_t predict_system_state(int16_t data, State_Prediction_Variables* state_pre
 * Imports data (new measurement), k (kalman gain), e (estimation variation), s (state estimation)
 * Exports new data (after filtering applied)
 */
-int16_t predict_system_state_test(int16_t data, double k, int16_t e, int16_t s) {
+int16_t predict_system_state_test(int16_t data, double* k, int16_t* e, int16_t* s) {
 	// This function is only to temporarily exist to allow external files to test exlsuively the kalman filtering function (without fixed bias removal
-	// Function simply calls the predict_system_state function with imported vars
+	// Function logic mirrors predict_system_state, using imported values as opposed to struct
+	int16_t r = data - *(s);
 
-	//create the state_prediction_variables struct
-	State_Prediction_Variables state_predict_vars = { k, e, s };
+	*k = calculate_kalman_gain(*e, r);
+	*e = calculate_estimate_variation(*k, *e);
+	*s = calculate_state_estimation(*s, *k, data);
 
-	// call predict_system_state function and return result
-	return predict_system_state(data, &state_predict_vars);
+	// explicity return filtered value, other values updated via address 
+	return *s;
 
 }
 
