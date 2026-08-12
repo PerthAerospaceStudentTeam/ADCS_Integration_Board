@@ -14,6 +14,8 @@
   * in the root directory of this software component.
   * If no LICENSE file comes with this software, it is provided AS-IS.
   *
+  * Taken from: https://github.com/STMicroelectronics/iis2mdc-pid on the 12/08/2026
+  *
   ******************************************************************************
   */
 
