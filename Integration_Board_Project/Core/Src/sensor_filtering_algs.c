@@ -11,10 +11,13 @@
 
 /* include header files */
 #include "sensor_filtering_algs.h"
+#include <stdlib.h>
+
 
 /* Define Structs containing fixed bias for x+y+z axis on each sensor */
 /* define placeholder until all bias values can be determined */
 #define PLACEHOLDER_BIAS 0
+#define PLACEHOLDER_PROCESS_NOISE 100
 
 typedef struct {
 	int16_t x;
@@ -30,6 +33,7 @@ typedef struct {
 	double kalman_gain;
 	int16_t estimation_variation;
 	int16_t state_estimation;
+	int16_t process_noise;
 } State_Prediction_Variables;
 
 /* Struct used to store variables required to filter each reading from IMU && MAG */
@@ -45,9 +49,9 @@ const static Fixed_Bias gyro_fixed_bias = {PLACEHOLDER_BIAS, PLACEHOLDER_BIAS, P
 const static Fixed_Bias mag_fixed_bias = {PLACEHOLDER_BIAS, PLACEHOLDER_BIAS, PLACEHOLDER_BIAS};
 
 /* Store variables required to complete state prediction filtering algorithms for each sensor measurement */
-static Sensor_Reading_Filtering accel_filtered_state = { {0.0, 0, 0}, {0.0, 0, 0}, {0.0, 0, 0} };
-static Sensor_Reading_Filtering gyro_filtered_state = { {0.0, 0, 0}, {0.0, 0, 0}, {0.0, 0, 0} };
-static Sensor_Reading_Filtering mag_filtered_state = { {0.0, 0, 0}, {0.0, 0, 0}, {0.0, 0, 0} };
+static Sensor_Reading_Filtering accel_filtered_state = { {0.0, 0, 0, PLACEHOLDER_PROCESS_NOISE}, {0.0, 0, 0, PLACEHOLDER_PROCESS_NOISE}, {0.0, 0, 0, PLACEHOLDER_PROCESS_NOISE} };
+static Sensor_Reading_Filtering gyro_filtered_state = { {0.0, 0, 0, PLACEHOLDER_PROCESS_NOISE}, {0.0, 0, 0, PLACEHOLDER_PROCESS_NOISE}, {0.0, 0, 0, PLACEHOLDER_PROCESS_NOISE} };
+static Sensor_Reading_Filtering mag_filtered_state = { {0.0, 0, 0, PLACEHOLDER_PROCESS_NOISE}, {0.0, 0, 0, PLACEHOLDER_PROCESS_NOISE}, {0.0, 0, 0, PLACEHOLDER_PROCESS_NOISE} };
 
 /*
 * Function to filter fixed bias from raw sensor readings
@@ -96,11 +100,11 @@ static double calculate_kalman_gain(int16_t p, int16_t r) {
 
 /*
 * Algorithm to calculate variance_in_estimation (p), determines the variance in current state prediction from prev.
-* imports: k (representing kalman gain), p (previous variance_in_estimation)
+* imports: k (representing kalman gain), p (previous variance_in_estimation), n (process noise)
 * exports: new value for variance_in_estimation
 */
-static int16_t calculate_estimate_variation(double k, int16_t p) {
-	return (int16_t)( (1.0 - k) * (double)p );
+static int16_t calculate_estimate_variation(double k, int16_t p, int16_t n) {
+	return (int16_t)( (1.0 - k) * (double)p ) + n;
 }
 
 /*
@@ -122,11 +126,11 @@ int16_t predict_system_state(int16_t data, State_Prediction_Variables* state_pre
 	int16_t measurement_variance;
 	
 	// calculate variance in current measurement from estimated state
-	measurement_variance = ( data - state_predict_vars->state_estimation );
+	measurement_variance = abs( data - state_predict_vars->state_estimation );
 
 	//apply state estimation algorithms in order (kalman->estimate_variation->state_estimation)
 	state_predict_vars->kalman_gain = calculate_kalman_gain(state_predict_vars->estimation_variation, measurement_variance);
-	state_predict_vars->estimation_variation = calculate_estimate_variation(state_predict_vars->kalman_gain, state_predict_vars->estimation_variation);
+	state_predict_vars->estimation_variation = calculate_estimate_variation(state_predict_vars->kalman_gain, state_predict_vars->estimation_variation, state_predict_vars->process_noise);
 	state_predict_vars->state_estimation = calculate_state_estimation(state_predict_vars->state_estimation, state_predict_vars->kalman_gain, data);
 
 	return state_predict_vars->state_estimation;
@@ -134,16 +138,16 @@ int16_t predict_system_state(int16_t data, State_Prediction_Variables* state_pre
 
 /*
 * Function used to test kalman state estimation filtering algorithm, modified to be used by external files (i.e. does not import struct specific to this file)
-* Imports data (new measurement), k (kalman gain), e (estimation variation), s (state estimation)
+* Imports data (new measurement), k (kalman gain), e (estimation variation), s (state estimation), p (process noise)
 * Exports new data (after filtering applied)
 */
-int16_t predict_system_state_test(int16_t data, double* k, int16_t* e, int16_t* s) {
+int16_t predict_system_state_test(int16_t data, double* k, int16_t* e, int16_t* s, int16_t *p) {
 	// This function is only to temporarily exist to allow external files to test exlsuively the kalman filtering function (without fixed bias removal
 	// Function logic mirrors predict_system_state, using imported values as opposed to struct
-	int16_t r = data - *(s);
+	int16_t r = abs(data - *(s));
 
 	*k = calculate_kalman_gain(*e, r);
-	*e = calculate_estimate_variation(*k, *e);
+	*e = calculate_estimate_variation(*k, *e, *p);
 	*s = calculate_state_estimation(*s, *k, data);
 
 	// explicity return filtered value, other values updated via address 
