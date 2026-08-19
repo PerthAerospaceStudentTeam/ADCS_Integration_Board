@@ -47,12 +47,6 @@ extern "C" {
 /* Exported macro ------------------------------------------------------------*/
 /* USER CODE BEGIN EM */
 
-/* Macros used for communication return statuses */
-#define COMMUNICATION_SUCCESS 0x00U
-#define COMMUNICATION_ERROR 0x01U
-#define COMMUNICATION_BUSY 0x02U
-#define COMMUNICATION_TIMEOUT 0x03U
-
 /* USER CODE END EM */
 
 void HAL_TIM_MspPostInit(TIM_HandleTypeDef *htim);
@@ -65,49 +59,43 @@ void Error_Handler(void);
 /* USER CODE END EFP */
 
 /* Private defines -----------------------------------------------------------*/
-#define MAG_CS_Pin GPIO_PIN_2
-#define MAG_CS_GPIO_Port GPIOB
 #define MAG_MOSI_Pin GPIO_PIN_3
 #define MAG_MOSI_GPIO_Port GPIOC
-#define MAG_SCK_Pin GPIO_PIN_10
-#define MAG_SCK_GPIO_Port GPIOB
-
-#define IMU_CS_Pin GPIO_PIN_4
-#define IMU_CS_GPIO_Port GPIOB
-#define IMU_MOSI_Pin GPIO_PIN_5
-#define IMU_MOSI_GPIO_Port GPIOB
-#define IMU_SCK_Pin GPIO_PIN_5
-#define IMU_SCK_GPIO_Port GPIOA
-
 #define MTA_PWM1_Pin GPIO_PIN_1
 #define MTA_PWM1_GPIO_Port GPIOA
 #define MTA_PWM2_Pin GPIO_PIN_2
 #define MTA_PWM2_GPIO_Port GPIOA
-
 #define MTB_PWM1_Pin GPIO_PIN_3
 #define MTB_PWM1_GPIO_Port GPIOA
-#define MTB_PWM2_Pin GPIO_PIN_15
-#define MTB_PWM2_GPIO_Port GPIOA
-
+#define IMU_SCK_Pin GPIO_PIN_5
+#define IMU_SCK_GPIO_Port GPIOA
+#define SUN_ZN_Pin GPIO_PIN_6
+#define SUN_ZN_GPIO_Port GPIOA
+#define SUN_YP_Pin GPIO_PIN_7
+#define SUN_YP_GPIO_Port GPIOA
+#define SUN_ZP_Pin GPIO_PIN_4
+#define SUN_ZP_GPIO_Port GPIOC
+#define SUN_XN_Pin GPIO_PIN_5
+#define SUN_XN_GPIO_Port GPIOC
+#define SUN_YN_Pin GPIO_PIN_0
+#define SUN_YN_GPIO_Port GPIOB
+#define SUN_XP_Pin GPIO_PIN_1
+#define SUN_XP_GPIO_Port GPIOB
+#define MAG_CS_Pin GPIO_PIN_2
+#define MAG_CS_GPIO_Port GPIOB
+#define MAG_SCK_Pin GPIO_PIN_10
+#define MAG_SCK_GPIO_Port GPIOB
 #define MTC_PWM2_Pin GPIO_PIN_6
 #define MTC_PWM2_GPIO_Port GPIOC
 #define MTC_PWM1_Pin GPIO_PIN_7
 #define MTC_PWM1_GPIO_Port GPIOC
+#define MTB_PWM2_Pin GPIO_PIN_15
+#define MTB_PWM2_GPIO_Port GPIOA
+#define IMU_CS_Pin GPIO_PIN_4
+#define IMU_CS_GPIO_Port GPIOB
+#define IMU_MOSI_Pin GPIO_PIN_5
+#define IMU_MOSI_GPIO_Port GPIOB
 
-#define SUN_XP_Pin GPIO_PIN_1
-#define SUN_XP_GPIO_Port GPIOB
-#define SUN_XN_Pin GPIO_PIN_5
-#define SUN_XN_GPIO_Port GPIOC
-
-#define SUN_YP_Pin GPIO_PIN_7
-#define SUN_YP_GPIO_Port GPIOA
-#define SUN_YN_Pin GPIO_PIN_0
-#define SUN_YN_GPIO_Port GPIOB
-
-#define SUN_ZP_Pin GPIO_PIN_4
-#define SUN_ZP_GPIO_Port GPIOC
-#define SUN_ZN_Pin GPIO_PIN_6
-#define SUN_ZN_GPIO_Port GPIOA
 /* USER CODE BEGIN Private defines */
 
 /* USER CODE END Private defines */
