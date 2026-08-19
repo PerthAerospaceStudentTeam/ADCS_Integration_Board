@@ -16,10 +16,10 @@
  ******************************************************************************
  */
 /* USER CODE END Header */
-/* Includes ----------------------------------------------------------------*/
+/* Includes ------------------------------------------------------------------*/
 #include "main.h"
 
-/* Private includes --------------------------------------------------------*/
+/* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include <math.h>
 #include <stdio.h>
@@ -30,22 +30,22 @@
 
 /* USER CODE END Includes */
 
-/* Private typedef ---------------------------------------------------------*/
+/* Private typedef -----------------------------------------------------------*/
 /* USER CODE BEGIN PTD */
 
 /* USER CODE END PTD */
 
-/* Private define ----------------------------------------------------------*/
+/* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
 
 /* USER CODE END PD */
 
-/* Private macro -----------------------------------------------------------*/
+/* Private macro -------------------------------------------------------------*/
 /* USER CODE BEGIN PM */
 
 /* USER CODE END PM */
 
-/* Private variables -------------------------------------------------------*/
+/* Private variables ---------------------------------------------------------*/
 ADC_HandleTypeDef hadc1;
 DMA_HandleTypeDef hdma_adc1;
 
@@ -61,7 +61,7 @@ UART_HandleTypeDef huart1;
 
 /* USER CODE END PV */
 
-/* Private function prototypes ---------------------------------------------*/
+/* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
 static void MPU_Config(void);
 static void MX_GPIO_Init(void);
@@ -72,11 +72,12 @@ static void MX_SPI2_Init(void);
 static void MX_TIM2_Init(void);
 static void MX_TIM3_Init(void);
 static void MX_ADC1_Init(void);
+
 /* USER CODE BEGIN PFP */
 
 /* USER CODE END PFP */
 
-/* Private user code -------------------------------------------------------*/
+/* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
 
 stmdev_ctx_t lsm6dso_ctx;
@@ -89,25 +90,40 @@ stmdev_ctx_t iis2mdc_ctx;
  * in main.h
  */
 
-/* ---------------------------- LSM6DSO IMU ----------------------------------
- * Notes: LSM6DSO using SPI1, CS = PB4
+/** LSM6DSO IMU --------------------------------------------------------------
+ * Notes:
+ *  LSM6DSO using SPI1
+ *  CS = PB4
+ */
+
+/**
+ * Uses the SPI interface defined by `handle` to write `len` bytes from the
+ * data buffer `bufp` to the LSM6DSO register `reg`.
+ *
+ * Writes multiple bytes to consecutive registers starting at `reg` only
+ * if LSM6DSO register CTRL3_C[2] = 1 (default). Otherwise multiple write
+ * operations are performed on `reg`.
+ *
+ * Inputs:
+ * `handle`:  pointer to the SPI interface handle of type `SPI_HandleTypeDef`
+ * `reg`:     initial write register address byte. MSB set to 0 for write
+ * `bufp`:    pointer to the data buffer
+ * `len`:     number of bytes to write
+ *
+ * Output:    status of write operation.
  */
 int32_t IMU_Write(void* handle, uint8_t reg, const uint8_t* bufp,
                   uint16_t len) {
-  int32_t write_status = COMMUNICATION_ERROR;
+  HAL_StatusTypeDef write_status = HAL_ERROR;
 
-  // Set CS = LOW to start communication
-  HAL_GPIO_WritePin(IMU_CS_GPIO_Port, IMU_CS_Pin, GPIO_PIN_RESET);
-
-  // Attempt SPI write
-  reg &= 0x7F;  // Set bit-0 LOW for write
-  write_status = HAL_SPI_Transmit(&hspi1, &reg, 1, 100);
+  HAL_GPIO_WritePin(IMU_CS_Port, IMU_CS_Pin, GPIO_PIN_RESET);  // Start SPI
+  reg &= 0x7F;  // Set MSB, reg[0] = 0 for write operation
+  write_status = HAL_SPI_Transmit(handle, &reg, 1, 100);
   if (write_status == COMMUNICATION_SUCCESS) {
-    write_status = HAL_SPI_Transmit(&hspi1, (uint8_t*)bufp, len, 100);
+    write_status = HAL_SPI_Transmit(handle, bufp, len, 100);
   }
 
-  // Set CS = HIGH to end communication
-  HAL_GPIO_WritePin(IMU_CS_GPIO_Port, IMU_CS_Pin, GPIO_PIN_SET);
+  HAL_GPIO_WritePin(IMU_CS_Port, IMU_CS_Pin, GPIO_PIN_SET);  // End SPI
   return write_status;
 }
 
@@ -237,6 +253,7 @@ int main(void) {
   MX_TIM2_Init();
   MX_TIM3_Init();
   MX_ADC1_Init();
+
   /* USER CODE BEGIN 2 */
   // LSM6DSO initialize
   lsm6dso_ctx.write_reg = IMU_Write;
@@ -345,8 +362,8 @@ int main(void) {
   //  float offset_y = sumy/(n-1);
   //  float offset_z = sumz/(n-1);
   //	sprintf(OFFSET, "OFFSET X=%.5f Y=%.5f Z=%.5f \r\n",offset_x, offset_y,
-  //offset_z); 	HAL_UART_Transmit(&huart1, (uint8_t *)OFFSET, strlen(OFFSET),
-  //HAL_MAX_DELAY); 	HAL_Delay(2000);
+  // offset_z); 	HAL_UART_Transmit(&huart1, (uint8_t *)OFFSET,
+  // strlen(OFFSET), HAL_MAX_DELAY); 	HAL_Delay(2000);
 
   uint32_t last_tick = HAL_GetTick();
   /* USER CODE END 2 */
@@ -373,22 +390,22 @@ int main(void) {
     //		  sprintf(SUN_DATA, "-Z = %u , +Z = %u, -X = %u, +X = %u, -Y =
     //%u, +Y = %u \r\n", Z_Minus, Z_Plus, X_Minus, X_Plus, Y_Minus, Y_Plus);
     //		  HAL_UART_Transmit(&huart1, (uint8_t*)SUN_DATA,
-    //strlen(SUN_DATA), HAL_MAX_DELAY); 		  HAL_ADC_Start_DMA(&hadc1,
+    // strlen(SUN_DATA), HAL_MAX_DELAY); HAL_ADC_Start_DMA(&hadc1,
     //(uint32_t*)sun, 6);
     //	  }
 
     //	  uint16_t SUN_Zp = sun[0]; //this block can be deleted
     //	  uint16_t SUN_Xm = sun[1];
     //	  sprintf(sun_outputs, "Z Positive: %u, X Negative: %u \r\n ", SUN_Zp,
-    //SUN_Xm); 	  HAL_UART_Transmit(&huart1,(uint8_t*)sun_outputs,
-    //strlen(sun_outputs), HAL_MAX_DELAY); 	  HAL_Delay(500);
+    // SUN_Xm); 	  HAL_UART_Transmit(&huart1,(uint8_t*)sun_outputs,
+    // strlen(sun_outputs), HAL_MAX_DELAY); 	  HAL_Delay(500);
 
     //	  HAL_ADC_Start(&hadc1); //this block can be deleted
     //	  HAL_ADC_PollForConversion(&hadc1, 100);
     //	  sun_Zp = HAL_ADC_GetValue(&hadc1);
     //	  sprintf(sun_output, "Sun: %u \r\n ", sun_Zp);
     //	  HAL_UART_Transmit(&huart1, (uint8_t*)sun_output, strlen(sun_output),
-    //HAL_MAX_DELAY); 	  HAL_Delay(500);
+    // HAL_MAX_DELAY); 	  HAL_Delay(500);
 
     //  	//getting dt from integrating gyro
     //  	uint32_t now = HAL_GetTick();
@@ -416,8 +433,8 @@ int main(void) {
     //      gyro_intermediate[2]= raw_gyro_to_degreespersecond(raw_gyro[2]) -
     //      offset_z;
     ////        snprintf(gyro_data, sizeof(gyro_data), "GYRO X=%.2f Y=%.2f
-    ///Z=%.2f \r\n", gyro_intermediate[0], gyro_intermediate[1],
-    ///gyro_intermediate[2]); /        HAL_UART_Transmit(&huart1, (uint8_t
+    /// Z=%.2f \r\n", gyro_intermediate[0], gyro_intermediate[1],
+    /// gyro_intermediate[2]); /        HAL_UART_Transmit(&huart1, (uint8_t
     ///*)gyro_data, strlen(gyro_data), HAL_MAX_DELAY);
     //      G_X_roll += (gyro_intermediate[0]) * dt;
     //      G_Y_pitch += (gyro_intermediate[1] )* dt ;
