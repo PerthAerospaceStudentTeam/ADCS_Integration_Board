@@ -21,12 +21,13 @@
 
 /* Private includes --------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
+#include <math.h>
 #include <stdio.h>
 #include <string.h>
-#include <math.h>
 
-#include "lsm6dso_reg.h"
 #include "iis2mdc_reg.h"
+#include "lsm6dso_reg.h"
+
 /* USER CODE END Includes */
 
 /* Private typedef ---------------------------------------------------------*/
@@ -99,10 +100,10 @@ int32_t IMU_Write(void* handle, uint8_t reg, const uint8_t* bufp,
   HAL_GPIO_WritePin(IMU_CS_GPIO_Port, IMU_CS_Pin, GPIO_PIN_RESET);
 
   // Attempt SPI write
-  reg &= 0x7F; // Set bit-0 LOW for write
+  reg &= 0x7F;  // Set bit-0 LOW for write
   write_status = HAL_SPI_Transmit(&hspi1, &reg, 1, 100);
   if (write_status == COMMUNICATION_SUCCESS) {
-    write_status = HAL_SPI_Transmit(&hspi1, (uint8_t*) bufp, len, 100);
+    write_status = HAL_SPI_Transmit(&hspi1, (uint8_t*)bufp, len, 100);
   }
 
   // Set CS = HIGH to end communication
@@ -117,7 +118,7 @@ int32_t IMU_Read(void* handle, uint8_t reg, uint8_t* bufp, uint16_t len) {
   HAL_GPIO_WritePin(IMU_CS_GPIO_Port, IMU_CS_Pin, GPIO_PIN_RESET);
 
   // Attempt SPI read
-  reg |= 0x80; // Set bit-0 HIGH for read
+  reg |= 0x80;  // Set bit-0 HIGH for read
   read_status = HAL_SPI_Transmit(&hspi1, &reg, 1, 1000);
   if (read_status == COMMUNICATION_SUCCESS) {
     read_status = HAL_SPI_Receive(&hspi1, bufp, len, 1000);
@@ -132,18 +133,17 @@ int32_t IMU_Read(void* handle, uint8_t reg, uint8_t* bufp, uint16_t len) {
  * Notes: IIS2MDC using SPI2, CS = PB2
  */
 int32_t MAG_Write(void* handle, uint8_t reg, const uint8_t* bufp,
-                      uint16_t len) {
+                  uint16_t len) {
   int32_t write_status = COMMUNICATION_ERROR;
 
   // Set CS = LOW to start communication
   HAL_GPIO_WritePin(MAG_CS_GPIO_Port, MAG_CS_Pin, GPIO_PIN_RESET);
 
   // Attempt SPI write
-  reg &= 0x7F; // Set bit-0 = LOW for write
+  reg &= 0x7F;  // Set bit-0 = LOW for write
   write_status = HAL_SPI_Transmit(&hspi2, &reg, 1, HAL_MAX_DELAY);
   if (write_status == COMMUNICATION_SUCCESS) {
-    write_status = HAL_SPI_Transmit(&hspi2, (uint8_t*) bufp, len,
-                                    HAL_MAX_DELAY);
+    write_status = HAL_SPI_Transmit(&hspi2, (uint8_t*)bufp, len, HAL_MAX_DELAY);
   }
 
   // Set CS = HIGH to end communication
@@ -171,31 +171,30 @@ int32_t MAG_Read(void* handle, uint8_t reg, uint8_t* bufp, uint16_t len) {
 
 /* Conversion helper */
 float raw_accel_to_mss(int16_t raw) {
-  return (float) raw * 0.00059f; //Data sheet conversion of 0.00061 overshoots
+  return (float)raw * 0.00059f;  // Data sheet conversion of 0.00061 overshoots
 }
 
 float raw_gyro_to_degreespersecond(int16_t raw) {
-  return raw * 0.00875f; //value from data sheet -- angular rate sensitivity type
+  return raw *
+         0.00875f;  // value from data sheet -- angular rate sensitivity type
 }
 
 // interrupt handler to ensure smooth ADC readings
 uint16_t sun[6];
 int ADC_Finished = 0;
-void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef* hadc) {
-  ADC_Finished = 1;
-}
+void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef* hadc) { ADC_Finished = 1; }
 
-//initiate variables for sun sensors
-int maxIntensity[6]; // Maximum sensor values
-int minIntensity[6]; // Minimum sensor values
+// initiate variables for sun sensors
+int maxIntensity[6];  // Maximum sensor values
+int minIntensity[6];  // Minimum sensor values
 void resetCalibration() {
   for (int i = 0; i < 6; i++) {
     maxIntensity[i] = 0;
-    minIntensity[i] = 65535; // 12-bit ADC range
+    minIntensity[i] = 65535;  // 12-bit ADC range
   }
   char SUN_Calibration[] = "Calibration Of ADC Sun Sensors";
-  HAL_UART_Transmit(&huart1, (uint8_t*) SUN_Calibration,
-                    strlen(SUN_Calibration), 100);
+  HAL_UART_Transmit(&huart1, (uint8_t*)SUN_Calibration, strlen(SUN_Calibration),
+                    100);
 }
 
 /* USER CODE END 0 */
@@ -205,7 +204,6 @@ void resetCalibration() {
  * @retval int
  */
 int main(void) {
-
   /* USER CODE BEGIN 1 */
 
   /* USER CODE END 1 */
@@ -215,7 +213,8 @@ int main(void) {
 
   /* MCU Configuration--------------------------------------------------------*/
 
-  /* Reset of all peripherals, Initializes the Flash interface and the Systick. */
+  /* Reset of all peripherals, Initializes the Flash interface and the Systick.
+   */
   HAL_Init();
 
   /* USER CODE BEGIN Init */
@@ -250,7 +249,10 @@ int main(void) {
   iis2mdc_ctx.handle = &hspi2;
 
   /* -------- LSM6DSO INIT -------- */
-  lsm6dso_spi_mode_set(&lsm6dso_ctx, LSM6DSO_SPI_3_WIRE); //using the stm32 lsm6dso library and should use this to work with 3 wire mode
+  lsm6dso_spi_mode_set(
+      &lsm6dso_ctx,
+      LSM6DSO_SPI_3_WIRE);  // using the stm32 lsm6dso library and should use
+                            // this to work with 3 wire mode
   lsm6dso_auto_increment_set(&lsm6dso_ctx, 1);
   lsm6dso_xl_data_rate_set(&lsm6dso_ctx, LSM6DSO_XL_ODR_833Hz);
   lsm6dso_block_data_update_set(&lsm6dso_ctx, 1);
@@ -261,22 +263,21 @@ int main(void) {
   iis2mdc_data_rate_set(&iis2mdc_ctx, IIS2MDC_ODR_100Hz);
   iis2mdc_block_data_update_set(&iis2mdc_ctx, 1);
 
-  //WHOAMI
+  // WHOAMI
   uint8_t VALUE = 0;
   IMU_Read(NULL, 0x0F, &VALUE, 1);
 
-  //testing to check if i can comm with the imu
+  // testing to check if i can comm with the imu
   char string[32];
   sprintf(string, "LSM6DOWHO_AM_I = 0x%02X \r\n", VALUE);
-  HAL_UART_Transmit(&huart1, (uint8_t*) string, strlen(string),
-  HAL_MAX_DELAY);
+  HAL_UART_Transmit(&huart1, (uint8_t*)string, strlen(string), HAL_MAX_DELAY);
 
   uint8_t whoami = 0;
   iis2mdc_device_id_get(&iis2mdc_ctx, &whoami);
 
   char msg[32];
   sprintf(msg, "IIS2MDC WHO_AM_I = 0x%02X\r\n", whoami);
-  HAL_UART_Transmit(&huart1, (uint8_t*) msg, strlen(msg), HAL_MAX_DELAY);
+  HAL_UART_Transmit(&huart1, (uint8_t*)msg, strlen(msg), HAL_MAX_DELAY);
 
   /* Variables */
   int16_t raw_accel[3];
@@ -284,7 +285,8 @@ int main(void) {
   char accel_data[64];
 
   int16_t raw_gyro[3];
-  // volatile char gyro_data[64]; // used for printing the raw gyro data - redundant
+  // volatile char gyro_data[64]; // used for printing the raw gyro data -
+  // redundant
   float gyro_intermediate[3];
   float G_X_roll = 0.0f;
   float G_Y_pitch = 0.0f;
@@ -299,7 +301,7 @@ int main(void) {
 
   /* testing Sun sensors */
 
-  HAL_ADC_Start_DMA(&hadc1, (uint32_t*) sun, 6);
+  HAL_ADC_Start_DMA(&hadc1, (uint32_t*)sun, 6);
   int16_t Z_Minus;
   int16_t Z_Plus;
   int16_t X_Plus;
@@ -309,11 +311,11 @@ int main(void) {
 
   char SUN_DATA[100];
 
-// testing the pwm channels are working for all the magnetometers
+  // testing the pwm channels are working for all the magnetometers
   HAL_TIM_PWM_Start(&htim2, TIM_CHANNEL_1);
-  __HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_1, 123); // ~50% of 255
+  __HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_1, 123);  // ~50% of 255
   HAL_TIM_PWM_Start(&htim2, TIM_CHANNEL_4);
-  __HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_4, 123); // ~50% of 255
+  __HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_4, 123);  // ~50% of 255
   HAL_TIM_PWM_Start(&htim2, TIM_CHANNEL_2);
   __HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_2, 123);
   HAL_TIM_PWM_Start(&htim2, TIM_CHANNEL_3);
@@ -323,15 +325,15 @@ int main(void) {
   HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_2);
   __HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_2, 123);
 
-  //gyro bias reduction
+  // gyro bias reduction
   lsm6dso_angular_rate_raw_get(&lsm6dso_ctx, raw_gyro);
   gyro_intermediate[0] = raw_gyro_to_degreespersecond(raw_gyro[0]);
   gyro_intermediate[1] = -raw_gyro_to_degreespersecond(raw_gyro[1]);
   gyro_intermediate[2] = raw_gyro_to_degreespersecond(raw_gyro[2]);
   float sumx = 0.0f, sumy = 0.0f, sumz = 0.0f;
   char waiting[] = "Calibrating offset values";
-  HAL_UART_Transmit(&huart1, (uint8_t*) waiting, strlen(waiting), 100);
-  int n = 1; //number of calibration trials
+  HAL_UART_Transmit(&huart1, (uint8_t*)waiting, strlen(waiting), 100);
+  int n = 1;  // number of calibration trials
   for (int i = 0; i < n; i++) {
     sumx += gyro_intermediate[0];
     sumy += gyro_intermediate[1];
@@ -339,12 +341,12 @@ int main(void) {
     HAL_Delay(3);
   }
 
-//  float offset_x = sumx/(n-1);
-//  float offset_y = sumy/(n-1);
-//  float offset_z = sumz/(n-1);
-//	sprintf(OFFSET, "OFFSET X=%.5f Y=%.5f Z=%.5f \r\n",offset_x, offset_y, offset_z);
-//	HAL_UART_Transmit(&huart1, (uint8_t *)OFFSET, strlen(OFFSET), HAL_MAX_DELAY);
-//	HAL_Delay(2000);
+  //  float offset_x = sumx/(n-1);
+  //  float offset_y = sumy/(n-1);
+  //  float offset_z = sumz/(n-1);
+  //	sprintf(OFFSET, "OFFSET X=%.5f Y=%.5f Z=%.5f \r\n",offset_x, offset_y,
+  //offset_z); 	HAL_UART_Transmit(&huart1, (uint8_t *)OFFSET, strlen(OFFSET),
+  //HAL_MAX_DELAY); 	HAL_Delay(2000);
 
   uint32_t last_tick = HAL_GetTick();
   /* USER CODE END 2 */
@@ -357,71 +359,80 @@ int main(void) {
     /* USER CODE BEGIN 3 */
     HAL_Delay(500);
 
-    //code to display raw data from sensors in the form of 2^16- 1
-//	  if (ADC_Finished == 1){
-//		  ADC_Finished = 0;
-//		  for(uint8_t i = 0; i<hadc1.Init.NbrOfConversion; i++){
-//			  Z_Minus= sun[0];
-//			  Z_Plus = sun[1];
-//			  X_Plus = sun[2];
-//			  Y_Plus = sun[3];
-//			  X_Minus = sun[4];
-//			  Y_Minus = sun[5];
-//		  }
-//		  sprintf(SUN_DATA, "-Z = %u , +Z = %u, -X = %u, +X = %u, -Y = %u, +Y = %u \r\n", Z_Minus, Z_Plus, X_Minus, X_Plus, Y_Minus, Y_Plus);
-//		  HAL_UART_Transmit(&huart1, (uint8_t*)SUN_DATA, strlen(SUN_DATA), HAL_MAX_DELAY);
-//		  HAL_ADC_Start_DMA(&hadc1, (uint32_t*)sun, 6);
-//	  }
+    // code to display raw data from sensors in the form of 2^16- 1
+    //	  if (ADC_Finished == 1){
+    //		  ADC_Finished = 0;
+    //		  for(uint8_t i = 0; i<hadc1.Init.NbrOfConversion; i++){
+    //			  Z_Minus= sun[0];
+    //			  Z_Plus = sun[1];
+    //			  X_Plus = sun[2];
+    //			  Y_Plus = sun[3];
+    //			  X_Minus = sun[4];
+    //			  Y_Minus = sun[5];
+    //		  }
+    //		  sprintf(SUN_DATA, "-Z = %u , +Z = %u, -X = %u, +X = %u, -Y =
+    //%u, +Y = %u \r\n", Z_Minus, Z_Plus, X_Minus, X_Plus, Y_Minus, Y_Plus);
+    //		  HAL_UART_Transmit(&huart1, (uint8_t*)SUN_DATA,
+    //strlen(SUN_DATA), HAL_MAX_DELAY); 		  HAL_ADC_Start_DMA(&hadc1,
+    //(uint32_t*)sun, 6);
+    //	  }
 
-//	  uint16_t SUN_Zp = sun[0]; //this block can be deleted
-//	  uint16_t SUN_Xm = sun[1];
-//	  sprintf(sun_outputs, "Z Positive: %u, X Negative: %u \r\n ", SUN_Zp, SUN_Xm);
-//	  HAL_UART_Transmit(&huart1,(uint8_t*)sun_outputs, strlen(sun_outputs), HAL_MAX_DELAY);
-//	  HAL_Delay(500);
+    //	  uint16_t SUN_Zp = sun[0]; //this block can be deleted
+    //	  uint16_t SUN_Xm = sun[1];
+    //	  sprintf(sun_outputs, "Z Positive: %u, X Negative: %u \r\n ", SUN_Zp,
+    //SUN_Xm); 	  HAL_UART_Transmit(&huart1,(uint8_t*)sun_outputs,
+    //strlen(sun_outputs), HAL_MAX_DELAY); 	  HAL_Delay(500);
 
-//	  HAL_ADC_Start(&hadc1); //this block can be deleted
-//	  HAL_ADC_PollForConversion(&hadc1, 100);
-//	  sun_Zp = HAL_ADC_GetValue(&hadc1);
-//	  sprintf(sun_output, "Sun: %u \r\n ", sun_Zp);
-//	  HAL_UART_Transmit(&huart1, (uint8_t*)sun_output, strlen(sun_output), HAL_MAX_DELAY);
-//	  HAL_Delay(500);
+    //	  HAL_ADC_Start(&hadc1); //this block can be deleted
+    //	  HAL_ADC_PollForConversion(&hadc1, 100);
+    //	  sun_Zp = HAL_ADC_GetValue(&hadc1);
+    //	  sprintf(sun_output, "Sun: %u \r\n ", sun_Zp);
+    //	  HAL_UART_Transmit(&huart1, (uint8_t*)sun_output, strlen(sun_output),
+    //HAL_MAX_DELAY); 	  HAL_Delay(500);
 
-//  	//getting dt from integrating gyro
-//  	uint32_t now = HAL_GetTick();
-//  	float dt = (now - last_tick	) / 1000.0f;
-//  	last_tick = now;
-//
-//  	//accelerometer
-//      lsm6dso_acceleration_raw_get(&lsm6dso_ctx, raw_accel);
-//
-//      accel_mss[0] = raw_accel_to_mss(raw_accel[0]);
-//      accel_mss[1] = raw_accel_to_mss(raw_accel[1]);
-//      accel_mss[2] = raw_accel_to_mss(raw_accel[2]);
-//
-//      snprintf(accel_data, sizeof(accel_data), "Accel X=%.2f Y=%.2f Z=%.2f\r\n", accel_mss[1], -accel_mss[0], accel_mss[2]);
-//      HAL_UART_Transmit(&huart1, (uint8_t *)accel_data, strlen(accel_data), HAL_MAX_DELAY);
-//
-//      //gyro
-//      lsm6dso_angular_rate_raw_get(&lsm6dso_ctx, raw_gyro);
-//
-//      gyro_intermediate[0]= raw_gyro_to_degreespersecond(raw_gyro[0]) -offset_x ;
-//      gyro_intermediate[1]= -raw_gyro_to_degreespersecond(raw_gyro[1]) - offset_y ;
-//      gyro_intermediate[2]= raw_gyro_to_degreespersecond(raw_gyro[2]) - offset_z;
-////        snprintf(gyro_data, sizeof(gyro_data), "GYRO X=%.2f Y=%.2f Z=%.2f \r\n", gyro_intermediate[0], gyro_intermediate[1], gyro_intermediate[2]);
-////        HAL_UART_Transmit(&huart1, (uint8_t *)gyro_data, strlen(gyro_data), HAL_MAX_DELAY);
-//      G_X_roll += (gyro_intermediate[0]) * dt;
-//      G_Y_pitch += (gyro_intermediate[1] )* dt ;
-//      G_Z_yaw += (gyro_intermediate[2]) * dt ;
-//
-//      sprintf(Gyro_accum, "GYRO roll=%.2f pitch=%.2f yaw=%.2f \r\n",G_X_roll, G_Y_pitch, G_Z_yaw);
-//      HAL_UART_Transmit(&huart1, (uint8_t *)Gyro_accum, strlen(Gyro_accum), HAL_MAX_DELAY);
-//
-//
-//     // loop for magnetometer data
-//      iis2mdc_magnetic_raw_get(&iis2mdc_ctx, raw_mag);
-//      sprintf(mag_data, "MAG DATA  X: %i Y: %i Z: %i \r\n", raw_mag[0], raw_mag[1], raw_mag[2]);
-//      HAL_UART_Transmit(&huart1, (uint8_t*)mag_data, strlen(mag_data), HAL_MAX_DELAY);
-//      HAL_Delay(10);
+    //  	//getting dt from integrating gyro
+    //  	uint32_t now = HAL_GetTick();
+    //  	float dt = (now - last_tick	) / 1000.0f;
+    //  	last_tick = now;
+    //
+    //  	//accelerometer
+    //      lsm6dso_acceleration_raw_get(&lsm6dso_ctx, raw_accel);
+    //
+    //      accel_mss[0] = raw_accel_to_mss(raw_accel[0]);
+    //      accel_mss[1] = raw_accel_to_mss(raw_accel[1]);
+    //      accel_mss[2] = raw_accel_to_mss(raw_accel[2]);
+    //
+    //      snprintf(accel_data, sizeof(accel_data), "Accel X=%.2f Y=%.2f
+    //      Z=%.2f\r\n", accel_mss[1], -accel_mss[0], accel_mss[2]);
+    //      HAL_UART_Transmit(&huart1, (uint8_t *)accel_data,
+    //      strlen(accel_data), HAL_MAX_DELAY);
+    //
+    //      //gyro
+    //      lsm6dso_angular_rate_raw_get(&lsm6dso_ctx, raw_gyro);
+    //
+    //      gyro_intermediate[0]= raw_gyro_to_degreespersecond(raw_gyro[0])
+    //      -offset_x ; gyro_intermediate[1]=
+    //      -raw_gyro_to_degreespersecond(raw_gyro[1]) - offset_y ;
+    //      gyro_intermediate[2]= raw_gyro_to_degreespersecond(raw_gyro[2]) -
+    //      offset_z;
+    ////        snprintf(gyro_data, sizeof(gyro_data), "GYRO X=%.2f Y=%.2f
+    ///Z=%.2f \r\n", gyro_intermediate[0], gyro_intermediate[1],
+    ///gyro_intermediate[2]); /        HAL_UART_Transmit(&huart1, (uint8_t
+    ///*)gyro_data, strlen(gyro_data), HAL_MAX_DELAY);
+    //      G_X_roll += (gyro_intermediate[0]) * dt;
+    //      G_Y_pitch += (gyro_intermediate[1] )* dt ;
+    //      G_Z_yaw += (gyro_intermediate[2]) * dt ;
+    //
+    //      sprintf(Gyro_accum, "GYRO roll=%.2f pitch=%.2f yaw=%.2f
+    //      \r\n",G_X_roll, G_Y_pitch, G_Z_yaw); HAL_UART_Transmit(&huart1,
+    //      (uint8_t *)Gyro_accum, strlen(Gyro_accum), HAL_MAX_DELAY);
+    //
+    //
+    //     // loop for magnetometer data
+    //      iis2mdc_magnetic_raw_get(&iis2mdc_ctx, raw_mag);
+    //      sprintf(mag_data, "MAG DATA  X: %i Y: %i Z: %i \r\n", raw_mag[0],
+    //      raw_mag[1], raw_mag[2]); HAL_UART_Transmit(&huart1,
+    //      (uint8_t*)mag_data, strlen(mag_data), HAL_MAX_DELAY); HAL_Delay(10);
   }
   /* USER CODE END 3 */
 }
@@ -431,8 +442,8 @@ int main(void) {
  * @retval None
  */
 void SystemClock_Config(void) {
-  RCC_OscInitTypeDef RCC_OscInitStruct = { 0 };
-  RCC_ClkInitTypeDef RCC_ClkInitStruct = { 0 };
+  RCC_OscInitTypeDef RCC_OscInitStruct = {0};
+  RCC_ClkInitTypeDef RCC_ClkInitStruct = {0};
 
   /*AXI clock gating */
   RCC->CKGAENR = 0xE003FFFF;
@@ -470,9 +481,9 @@ void SystemClock_Config(void) {
 
   /** Initializes the CPU, AHB and APB buses clocks
    */
-  RCC_ClkInitStruct.ClockType = RCC_CLOCKTYPE_HCLK | RCC_CLOCKTYPE_SYSCLK
-          | RCC_CLOCKTYPE_PCLK1 | RCC_CLOCKTYPE_PCLK2 | RCC_CLOCKTYPE_D3PCLK1
-          | RCC_CLOCKTYPE_D1PCLK1;
+  RCC_ClkInitStruct.ClockType = RCC_CLOCKTYPE_HCLK | RCC_CLOCKTYPE_SYSCLK |
+                                RCC_CLOCKTYPE_PCLK1 | RCC_CLOCKTYPE_PCLK2 |
+                                RCC_CLOCKTYPE_D3PCLK1 | RCC_CLOCKTYPE_D1PCLK1;
   RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_HSI;
   RCC_ClkInitStruct.SYSCLKDivider = RCC_SYSCLK_DIV1;
   RCC_ClkInitStruct.AHBCLKDivider = RCC_HCLK_DIV1;
@@ -492,13 +503,12 @@ void SystemClock_Config(void) {
  * @retval None
  */
 static void MX_ADC1_Init(void) {
-
   /* USER CODE BEGIN ADC1_Init 0 */
 
   /* USER CODE END ADC1_Init 0 */
 
-  ADC_MultiModeTypeDef multimode = { 0 };
-  ADC_ChannelConfTypeDef sConfig = { 0 };
+  ADC_MultiModeTypeDef multimode = {0};
+  ADC_ChannelConfTypeDef sConfig = {0};
 
   /* USER CODE BEGIN ADC1_Init 1 */
 
@@ -587,7 +597,6 @@ static void MX_ADC1_Init(void) {
   /* USER CODE BEGIN ADC1_Init 2 */
 
   /* USER CODE END ADC1_Init 2 */
-
 }
 
 /**
@@ -596,7 +605,6 @@ static void MX_ADC1_Init(void) {
  * @retval None
  */
 static void MX_SPI1_Init(void) {
-
   /* USER CODE BEGIN SPI1_Init 0 */
 
   /* USER CODE END SPI1_Init 0 */
@@ -621,9 +629,9 @@ static void MX_SPI1_Init(void) {
   hspi1.Init.NSSPolarity = SPI_NSS_POLARITY_LOW;
   hspi1.Init.FifoThreshold = SPI_FIFO_THRESHOLD_01DATA;
   hspi1.Init.TxCRCInitializationPattern =
-  SPI_CRC_INITIALIZATION_ALL_ZERO_PATTERN;
+      SPI_CRC_INITIALIZATION_ALL_ZERO_PATTERN;
   hspi1.Init.RxCRCInitializationPattern =
-  SPI_CRC_INITIALIZATION_ALL_ZERO_PATTERN;
+      SPI_CRC_INITIALIZATION_ALL_ZERO_PATTERN;
   hspi1.Init.MasterSSIdleness = SPI_MASTER_SS_IDLENESS_00CYCLE;
   hspi1.Init.MasterInterDataIdleness = SPI_MASTER_INTERDATA_IDLENESS_00CYCLE;
   hspi1.Init.MasterReceiverAutoSusp = SPI_MASTER_RX_AUTOSUSP_DISABLE;
@@ -635,7 +643,6 @@ static void MX_SPI1_Init(void) {
   /* USER CODE BEGIN SPI1_Init 2 */
 
   /* USER CODE END SPI1_Init 2 */
-
 }
 
 /**
@@ -644,7 +651,6 @@ static void MX_SPI1_Init(void) {
  * @retval None
  */
 static void MX_SPI2_Init(void) {
-
   /* USER CODE BEGIN SPI2_Init 0 */
 
   /* USER CODE END SPI2_Init 0 */
@@ -669,9 +675,9 @@ static void MX_SPI2_Init(void) {
   hspi2.Init.NSSPolarity = SPI_NSS_POLARITY_LOW;
   hspi2.Init.FifoThreshold = SPI_FIFO_THRESHOLD_01DATA;
   hspi2.Init.TxCRCInitializationPattern =
-  SPI_CRC_INITIALIZATION_ALL_ZERO_PATTERN;
+      SPI_CRC_INITIALIZATION_ALL_ZERO_PATTERN;
   hspi2.Init.RxCRCInitializationPattern =
-  SPI_CRC_INITIALIZATION_ALL_ZERO_PATTERN;
+      SPI_CRC_INITIALIZATION_ALL_ZERO_PATTERN;
   hspi2.Init.MasterSSIdleness = SPI_MASTER_SS_IDLENESS_00CYCLE;
   hspi2.Init.MasterInterDataIdleness = SPI_MASTER_INTERDATA_IDLENESS_00CYCLE;
   hspi2.Init.MasterReceiverAutoSusp = SPI_MASTER_RX_AUTOSUSP_DISABLE;
@@ -683,7 +689,6 @@ static void MX_SPI2_Init(void) {
   /* USER CODE BEGIN SPI2_Init 2 */
 
   /* USER CODE END SPI2_Init 2 */
-
 }
 
 /**
@@ -692,14 +697,13 @@ static void MX_SPI2_Init(void) {
  * @retval None
  */
 static void MX_TIM2_Init(void) {
-
   /* USER CODE BEGIN TIM2_Init 0 */
 
   /* USER CODE END TIM2_Init 0 */
 
-  TIM_ClockConfigTypeDef sClockSourceConfig = { 0 };
-  TIM_MasterConfigTypeDef sMasterConfig = { 0 };
-  TIM_OC_InitTypeDef sConfigOC = { 0 };
+  TIM_ClockConfigTypeDef sClockSourceConfig = {0};
+  TIM_MasterConfigTypeDef sMasterConfig = {0};
+  TIM_OC_InitTypeDef sConfigOC = {0};
 
   /* USER CODE BEGIN TIM2_Init 1 */
 
@@ -745,7 +749,6 @@ static void MX_TIM2_Init(void) {
 
   /* USER CODE END TIM2_Init 2 */
   HAL_TIM_MspPostInit(&htim2);
-
 }
 
 /**
@@ -754,13 +757,12 @@ static void MX_TIM2_Init(void) {
  * @retval None
  */
 static void MX_TIM3_Init(void) {
-
   /* USER CODE BEGIN TIM3_Init 0 */
 
   /* USER CODE END TIM3_Init 0 */
 
-  TIM_MasterConfigTypeDef sMasterConfig = { 0 };
-  TIM_OC_InitTypeDef sConfigOC = { 0 };
+  TIM_MasterConfigTypeDef sMasterConfig = {0};
+  TIM_OC_InitTypeDef sConfigOC = {0};
 
   /* USER CODE BEGIN TIM3_Init 1 */
 
@@ -793,7 +795,6 @@ static void MX_TIM3_Init(void) {
 
   /* USER CODE END TIM3_Init 2 */
   HAL_TIM_MspPostInit(&htim3);
-
 }
 
 /**
@@ -802,7 +803,6 @@ static void MX_TIM3_Init(void) {
  * @retval None
  */
 static void MX_USART1_UART_Init(void) {
-
   /* USER CODE BEGIN USART1_Init 0 */
 
   /* USER CODE END USART1_Init 0 */
@@ -824,12 +824,12 @@ static void MX_USART1_UART_Init(void) {
   if (HAL_UART_Init(&huart1) != HAL_OK) {
     Error_Handler();
   }
-  if (HAL_UARTEx_SetTxFifoThreshold(&huart1, UART_TXFIFO_THRESHOLD_1_8)
-          != HAL_OK) {
+  if (HAL_UARTEx_SetTxFifoThreshold(&huart1, UART_TXFIFO_THRESHOLD_1_8) !=
+      HAL_OK) {
     Error_Handler();
   }
-  if (HAL_UARTEx_SetRxFifoThreshold(&huart1, UART_RXFIFO_THRESHOLD_1_8)
-          != HAL_OK) {
+  if (HAL_UARTEx_SetRxFifoThreshold(&huart1, UART_RXFIFO_THRESHOLD_1_8) !=
+      HAL_OK) {
     Error_Handler();
   }
   if (HAL_UARTEx_DisableFifoMode(&huart1) != HAL_OK) {
@@ -838,14 +838,12 @@ static void MX_USART1_UART_Init(void) {
   /* USER CODE BEGIN USART1_Init 2 */
 
   /* USER CODE END USART1_Init 2 */
-
 }
 
 /**
  * Enable DMA controller clock
  */
 static void MX_DMA_Init(void) {
-
   /* DMA controller clock enable */
   __HAL_RCC_DMA1_CLK_ENABLE();
 
@@ -853,7 +851,6 @@ static void MX_DMA_Init(void) {
   /* DMA1_Stream0_IRQn interrupt configuration */
   HAL_NVIC_SetPriority(DMA1_Stream0_IRQn, 0, 0);
   HAL_NVIC_EnableIRQ(DMA1_Stream0_IRQn);
-
 }
 
 /**
@@ -862,7 +859,7 @@ static void MX_DMA_Init(void) {
  * @retval None
  */
 static void MX_GPIO_Init(void) {
-  GPIO_InitTypeDef GPIO_InitStruct = { 0 };
+  GPIO_InitTypeDef GPIO_InitStruct = {0};
   /* USER CODE BEGIN MX_GPIO_Init_1 */
 
   /* USER CODE END MX_GPIO_Init_1 */
@@ -897,7 +894,7 @@ static void MX_GPIO_Init(void) {
 /* MPU Configuration */
 
 void MPU_Config(void) {
-  MPU_Region_InitTypeDef MPU_InitStruct = { 0 };
+  MPU_Region_InitTypeDef MPU_InitStruct = {0};
 
   /* Disables the MPU */
   HAL_MPU_Disable();
@@ -919,7 +916,6 @@ void MPU_Config(void) {
   HAL_MPU_ConfigRegion(&MPU_InitStruct);
   /* Enables the MPU */
   HAL_MPU_Enable(MPU_PRIVILEGED_DEFAULT);
-
 }
 
 /**
@@ -936,17 +932,17 @@ void Error_Handler(void) {
 }
 #ifdef USE_FULL_ASSERT
 /**
-  * @brief  Reports the name of the source file and the source line number
-  *         where the assert_param error has occurred.
-  * @param  file: pointer to the source file name
-  * @param  line: assert_param error line source number
-  * @retval None
-  */
-void assert_failed(uint8_t *file, uint32_t line)
-{
+ * @brief  Reports the name of the source file and the source line number
+ *         where the assert_param error has occurred.
+ * @param  file: pointer to the source file name
+ * @param  line: assert_param error line source number
+ * @retval None
+ */
+void assert_failed(uint8_t* file, uint32_t line) {
   /* USER CODE BEGIN 6 */
-  /* User can add his own implementation to report the file name and line number,
-     ex: printf("Wrong parameters value: file %s on line %d\r\n", file, line) */
+  /* User can add his own implementation to report the file name and line
+     number, ex: printf("Wrong parameters value: file %s on line %d\r\n", file,
+     line) */
   /* USER CODE END 6 */
 }
 #endif /* USE_FULL_ASSERT */
