@@ -110,43 +110,57 @@ stmdev_ctx_t iis2mdc_ctx;
  * `bufp`:    pointer to the data buffer
  * `len`:     number of bytes to write
  *
- * Output:    status of write operation.
+ * Output:    status of write operation
  */
 int32_t IMU_Write(void* handle, uint8_t reg, const uint8_t* bufp,
                   uint16_t len) {
   HAL_StatusTypeDef write_status = HAL_ERROR;
 
   HAL_GPIO_WritePin(IMU_CS_Port, IMU_CS_Pin, GPIO_PIN_RESET);  // Start SPI
-  reg &= 0x7F;  // Set MSB, reg[0] = 0 for write operation
-  write_status = HAL_SPI_Transmit(handle, &reg, 1, 100);
-  if (write_status == COMMUNICATION_SUCCESS) {
-    write_status = HAL_SPI_Transmit(handle, bufp, len, 100);
+  reg &= 0x7F;  // Set MSB = 0 for write operation
+  write_status = HAL_SPI_Transmit(handle, &reg, 1, 10);  // Send write register
+  if (write_status == HAL_OK) {
+    write_status = HAL_SPI_Transmit(handle, bufp, len, 10);  // Perform write
   }
 
-  HAL_GPIO_WritePin(IMU_CS_Port, IMU_CS_Pin, GPIO_PIN_SET);  // End SPI
+  HAL_GPIO_WritePin(IMU_CS_Port, IMU_CS_Pin, GPIO_PIN_SET);  // Stop SPI
   return write_status;
 }
 
+/**
+ * Uses the SPI interface defined by `handle` to read `len` bytes from the
+ * the LSM6DSO register `reg` into the data buffer `bufp`.
+ *
+ * Reads multiple bytes from consecutive registers starting at `reg` only
+ * if LSM6DSO register CTRL3_C[2] = 1 (default). Otherwise multiple read
+ * operations are performed on `reg`.
+ *
+ * Inputs:
+ * `handle`:  pointer to the SPI interface handle of type `SPI_HandleTypeDef`
+ * `reg`:     initial read register address byte. MSB set to 1 for read
+ * `bufp`:    pointer to the data buffer
+ * `len`:     number of bytes to read
+ *
+ * Output:    status of read operation
+ */
 int32_t IMU_Read(void* handle, uint8_t reg, uint8_t* bufp, uint16_t len) {
-  int32_t read_status = COMMUNICATION_ERROR;
+  HAL_StatusTypeDef read_status = HAL_ERROR;
 
-  // Set CS = LOW to start communication
-  HAL_GPIO_WritePin(IMU_CS_GPIO_Port, IMU_CS_Pin, GPIO_PIN_RESET);
-
-  // Attempt SPI read
-  reg |= 0x80;  // Set bit-0 HIGH for read
-  read_status = HAL_SPI_Transmit(&hspi1, &reg, 1, 1000);
-  if (read_status == COMMUNICATION_SUCCESS) {
-    read_status = HAL_SPI_Receive(&hspi1, bufp, len, 1000);
+  HAL_GPIO_WritePin(IMU_CS_Port, IMU_CS_Pin, GPIO_PIN_RESET);  // Start SPI
+  reg |= 0x80;  // Set MSB = 1 for read operation
+  read_status = HAL_SPI_Transmit(handle, &reg, 1, 10);  // Send read register
+  if (read_status == HAL_OK) {
+    read_status = HAL_SPI_Receive(handle, bufp, len, 10);  // Perform read
   }
 
-  // Set CS = HIGH to end communication
-  HAL_GPIO_WritePin(IMU_CS_GPIO_Port, IMU_CS_Pin, GPIO_PIN_SET);
+  HAL_GPIO_WritePin(IMU_CS_Port, IMU_CS_Pin, GPIO_PIN_SET);  // Stop SPI
   return read_status;
 }
 
 /* ---------------------------- IIS2MDC MAG ----------------------------------
- * Notes: IIS2MDC using SPI2, CS = PB2
+ * Notes:
+ *  IIS2MDC using SPI2
+ *  CS = PB2
  */
 int32_t MAG_Write(void* handle, uint8_t reg, const uint8_t* bufp,
                   uint16_t len) {
