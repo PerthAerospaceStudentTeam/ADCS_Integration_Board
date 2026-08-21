@@ -17,11 +17,12 @@
 	} Sensor_Type;
 
 
-	/* Function declaration (actual function provided to filter sensor data) */
+	/* Function declarations */
 	void filter_sensor_data(int16_t data[3], Sensor_Type data_source);
+	void calculate_sensor_process_noise();
 
 	/* Testing functions (these functions are temporarily available to other files to test independently) */
-	int16_t predict_system_state_test(int16_t data, double* k, int16_t* e, int16_t* s, int16_t* p);
+	int16_t predict_system_state_test(int16_t data, double* k, int16_t* e, int16_t* s, int16_t p);
 	void filter_fixed_bias(int16_t raw_data[3], Sensor_Type data_source);
 	void kalman_state_estimation(int16_t data[3], Sensor_Type data_source);
 
