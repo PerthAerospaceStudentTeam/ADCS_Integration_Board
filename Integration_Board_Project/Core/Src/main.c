@@ -79,17 +79,28 @@ static void MX_ADC1_Init(void);
 
 stmdev_ctx_t lsm6dso_ctx;
 stmdev_ctx_t iis2mdc_ctx;
+ 
+/* COMMUNICATION FUNCTIONS */
+/* Functions should not handle failed write operation itself (i.e. loop until success), this should be responsibility of calling function */
+/* All possible return values of functions correspond to COMMUNICATION_... macros defined in main.h */
 
 // LSM6DSO SPI1, CS = PB4
 int32_t lsm6dso_write(void *handle, uint8_t reg,
                       const uint8_t *bufp, uint16_t len)
-{
+{ 
     reg &= 0x7F;
     HAL_GPIO_WritePin(GPIOB, GPIO_PIN_4, GPIO_PIN_RESET); // CS Low
-    HAL_SPI_Transmit(&hspi1, &reg, 1, 100);
-    HAL_SPI_Transmit(&hspi1, (uint8_t*)bufp, len, 100);
+
+    /* write register address to peripheral */
+    int32_t write_status = HAL_SPI_Transmit(&hspi1, &reg, 1, 100)
+
+    /* only attempt to write data to peripheral if register write was successful */
+    if (write_status == COMMUNICATION_SUCCESS) {
+        write_status = HAL_SPI_Transmit(&hspi1, (uint8_t*)bufp, len, 100);
+    }
+
     HAL_GPIO_WritePin(GPIOB, GPIO_PIN_4, GPIO_PIN_SET); // CS High
-    return 0;
+    return write_status;
 
 }
 
@@ -97,11 +108,18 @@ int32_t lsm6dso_read(void *handle, uint8_t reg,
                      uint8_t *bufp, uint16_t len)
 {
 	  reg |= 0x80;
-	  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_4, GPIO_PIN_RESET);
-	  HAL_SPI_Transmit(&hspi1, &reg, 1, 1000);
-	  HAL_SPI_Receive(&hspi1, bufp, len, 1000);
+	  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_4, GPIO_PIN_RESET); //CS Low
+
+    /* write register address to peripheral */
+	  int32_t comm_status = HAL_SPI_Transmit(&hspi1, &reg, 1, 1000);
+
+    /* only attempt to read data from peripheral if register write was successful */
+    if (comm_status == COMMUNICATION_SUCCESS) {
+        comm_status = HAL_SPI_Receive(&hspi1, bufp, len, 1000);
+    }
+	  
 	  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_4, GPIO_PIN_SET);
-return 0;
+    return comm_status;
 }
 
 // IIS2MDC SPI2, CS = PB2
@@ -110,11 +128,17 @@ int32_t mag_platform_write(void *handle, uint8_t reg,
 {
     reg &= 0x7F;
     HAL_GPIO_WritePin(GPIOB, GPIO_PIN_2, GPIO_PIN_RESET);
-    HAL_SPI_Transmit(&hspi2, &reg, 1, HAL_MAX_DELAY);
-    HAL_SPI_Transmit(&hspi2, (uint8_t *)bufp, len, HAL_MAX_DELAY);
-    HAL_GPIO_WritePin(GPIOB, GPIO_PIN_2, GPIO_PIN_SET);
+    
+    /* write the register address to peripheral device */
+    int32_t write_status = HAL_SPI_Transmit(&hspi2, &reg, 1, HAL_MAX_DELAY);
 
-    return 0;
+    /* only attempt to write data to peripheral if register write was successful */
+    if (write_status == COMMUNICATION_SUCCESS) {
+        write_status = HAL_SPI_Transmit(&hspi2, (uint8_t *)bufp, len, HAL_MAX_DELAY);
+    }
+
+    HAL_GPIO_WritePin(GPIOB, GPIO_PIN_2, GPIO_PIN_SET);
+    return write_status;
 }
 
 int32_t mag_platform_read(void *handle, uint8_t reg,
@@ -122,11 +146,17 @@ int32_t mag_platform_read(void *handle, uint8_t reg,
 {
     reg |= 0x80;
     HAL_GPIO_WritePin(GPIOB, GPIO_PIN_2, GPIO_PIN_RESET);
-    HAL_SPI_Transmit(&hspi2, &reg, 1, HAL_MAX_DELAY);
-    HAL_SPI_Receive(&hspi2, bufp, len, HAL_MAX_DELAY);
+    
+    /* write address of register to peripheral device */
+    int32_t comm_status = HAL_SPI_Transmit(&hspi2, &reg, 1, HAL_MAX_DELAY);
+    
+    /* only attempt to read data from peripheral device if register write to device was successful */
+    if (comm_status == COMMUNICATION_SUCCESS) {
+        comm_status = HAL_SPI_Receive(&hspi2, bufp, len, HAL_MAX_DELAY);
+    }
+    
     HAL_GPIO_WritePin(GPIOB, GPIO_PIN_2, GPIO_PIN_SET);
-
-    return 0;
+    return comm_status;
 }
 
 /* Conversion helper */
