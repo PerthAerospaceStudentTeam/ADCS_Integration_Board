@@ -66,6 +66,7 @@ TIM_HandleTypeDef htim3;
 UART_HandleTypeDef huart1;
 
 /* USER CODE BEGIN PV */
+int ADC_Finished = 0;
 
 /* USER CODE END PV */
 
@@ -163,9 +164,9 @@ int32_t SensorRead(void* handle, uint8_t reg, uint8_t* bufp, uint16_t len) {
   return status;
 }
 
-// interrupt handler to ensure smooth ADC readings
-uint16_t sun[6];
-int ADC_Finished = 0;
+/*
+ * User defined ADC interrupt handler for callbacks 
+ */
 void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef* hadc) { ADC_Finished = 1; }
 
 // initiate variables for sun sensors
@@ -176,9 +177,6 @@ void resetCalibration() {
     maxIntensity[i] = 0U;
     minIntensity[i] = 0xFFFFU;  // 16-bit max of ADC range
   }
-  char SUN_Calibration[] = "Calibration Of ADC Sun Sensors";
-  HAL_UART_Transmit(&huart1, (uint8_t*)SUN_Calibration, strlen(SUN_Calibration),
-                    100);
 }
 
 /* USER CODE END 0 */
@@ -224,7 +222,7 @@ int main(void) {
 
   /* USER CODE BEGIN 2 */
 
-  // Initialise LSM6DSO Inertial Measurement Unit handle
+  // Initialise LSM6DSO inertial measurement unit handle
   Sensor_HandleTypeDef IMU_h;
   IMU_h.interface_h = &hspi1;
   IMU_h.cs_port = IMU_CS_GPIO_Port;
@@ -246,79 +244,51 @@ int main(void) {
   MAG_ctx.read_reg = SensorRead;
   MAG_ctx.handle = &MAG_h;
 
-  /* -------- LSM6DSO INIT -------- */
+  // Configure LSM6DSO settings
+  lsm6dso_i3c_disable_set(&IMU_ctx, LSM6DSO_I3C_DISABLE);
   lsm6dso_spi_mode_set(&IMU_ctx, LSM6DSO_SPI_3_WIRE);
-  lsm6dso_auto_increment_set(&IMU_ctx, 1);
+  lsm6dso_auto_increment_set(&IMU_ctx, PROPERTY_ENABLE);
+  lsm6dso_block_data_update_set(&IMU_ctx, PROPERTY_ENABLE);
   lsm6dso_xl_data_rate_set(&IMU_ctx, LSM6DSO_XL_ODR_833Hz);
-  lsm6dso_block_data_update_set(&IMU_ctx, 1);
-  lsm6dso_gy_full_scale_set(&IMU_ctx, LSM6DSO_250dps);
+  lsm6dso_xl_full_scale_set(&IMU_ctx, LSM6DSO_2g);
   lsm6dso_gy_data_rate_set(&IMU_ctx, LSM6DSO_GY_ODR_833Hz);
+  lsm6dso_gy_full_scale_set(&IMU_ctx, LSM6DSO_250dps);
 
-  /* -----iis2mdc INIT ----- */
+  // Configure IIS2MDC settings
+  iis2mdc_block_data_update_set(&MAG_ctx, PROPERTY_ENABLE);
   iis2mdc_data_rate_set(&MAG_ctx, IIS2MDC_ODR_100Hz);
-  iis2mdc_block_data_update_set(&MAG_ctx, 1);
+  iis2mdc_offset_temp_comp_set(&MAG_ctx, PROPERTY_ENABLE);
+  iis2mdc_operating_mode_set(&MAG_ctx, IIS2MDC_CONTINUOUS_MODE);
 
-  // WHOAMI
-  uint8_t VALUE = 0;
-  //  IMU_Read(NULL, 0x0F, &VALUE, 1);
+  // Basic device ID verification over UART
+  uint8_t whoAmI;
+  char id_msg[64];
 
-  // testing to check if i can comm with the imu
-  char string[32];
-  sprintf(string, "LSM6DOWHO_AM_I = 0x%02X \r\n", VALUE);
-  HAL_UART_Transmit(&huart1, (uint8_t*)string, strlen(string), HAL_MAX_DELAY);
+  lsm6dso_device_id_get(&IMU_ctx, &whoAmI);
+  sprintf(id_msg, "LSM6DSO ID: expected %d, read %d\n", LSM6DSO_ID, whoAmI);
+  HAL_UART_Transmit(&huart1, (uint8_t*)id_msg, strlen(id_msg), 100);
 
-  uint8_t whoami = 0;
-  iis2mdc_device_id_get(&MAG_ctx, &whoami);
+  iis2mdc_device_id_get(&MAG_ctx, &whoAmI);
+  sprintf(id_msg, "IIS2MDC ID: expected %d, read %d\n", IIS2MDC_ID, whoAmI);
+  HAL_UART_Transmit(&huart1, (uint8_t*)id_msg, strlen(id_msg), 100);
 
-  char msg[32];
-  sprintf(msg, "IIS2MDC WHO_AM_I = 0x%02X\r\n", whoami);
-  HAL_UART_Transmit(&huart1, (uint8_t*)msg, strlen(msg), HAL_MAX_DELAY);
-
-  /* Variables */
-  int16_t raw_accel[3];
-  float accel_mss[3];
-  char accel_data[64];
-
-  int16_t raw_gyro[3];
-  // volatile char gyro_data[64]; // used for printing the raw gyro data -
-  // redundant
-  float gyro_intermediate[3];
-  float G_X_roll = 0.0f;
-  float G_Y_pitch = 0.0f;
-  float G_Z_yaw = 0.0f;
-  char Gyro_accum[64];
-  char OFFSET[64];
-
-  int16_t raw_mag[3];
-  char mag_data[64];
-
-  float dt = 0.0f;
-
-  /* testing Sun sensors */
-
+  // Initialising DMA for sun sensor ADC (ADC1)
+  uint16_t sun[6];
   HAL_ADC_Start_DMA(&hadc1, (uint32_t*)sun, 6);
-  int16_t Z_Minus;
-  int16_t Z_Plus;
-  int16_t X_Plus;
-  int16_t Y_Plus;
-  int16_t X_Minus;
-  int16_t Y_Minus;
 
-  char SUN_DATA[100];
-
-  // testing the pwm channels are working for all the magnetometers
+  // Initialising PWM timers for magnetorquer H-bridges and setting to ~50%
   HAL_TIM_PWM_Start(&htim2, TIM_CHANNEL_1);
-  __HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_1, 123);  // ~50% of 255
+  __HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_1, 128);
   HAL_TIM_PWM_Start(&htim2, TIM_CHANNEL_4);
-  __HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_4, 123);  // ~50% of 255
+  __HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_4, 128);
   HAL_TIM_PWM_Start(&htim2, TIM_CHANNEL_2);
-  __HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_2, 123);
+  __HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_2, 128);
   HAL_TIM_PWM_Start(&htim2, TIM_CHANNEL_3);
-  __HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_3, 123);
+  __HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_3, 128);
   HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_1);
-  __HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_1, 123);
+  __HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_1, 128);
   HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_2);
-  __HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_2, 123);
+  __HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_2, 128);
 
   // gyro bias reduction
   lsm6dso_angular_rate_raw_get(&IMU_ctx, raw_gyro);
@@ -343,11 +313,35 @@ int main(void) {
   // offset_z); 	HAL_UART_Transmit(&huart1, (uint8_t *)OFFSET,
   // strlen(OFFSET), HAL_MAX_DELAY); 	HAL_Delay(2000);
 
-  uint32_t last_tick = HAL_GetTick();
   /* USER CODE END 2 */
-
+  
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
+
+  /* Variables */
+  int16_t raw_accel[3];
+  float accel_mss[3];
+  char accel_data[64];
+  int16_t raw_gyro[3];
+  volatile char gyro_data[64];
+  float gyro_intermediate[3];
+  float G_X_roll = 0.0f;
+  float G_Y_pitch = 0.0f;
+  float G_Z_yaw = 0.0f;
+  char Gyro_accum[64];
+  char OFFSET[64];
+  int16_t raw_mag[3];
+  char mag_data[64];
+  float dt = 0.0f;
+  int16_t Z_Minus;
+  int16_t Z_Plus;
+  int16_t X_Plus;
+  int16_t Y_Plus;
+  int16_t X_Minus;
+  int16_t Y_Minus;
+  char SUN_DATA[100];
+
+  uint32_t last_tick = HAL_GetTick();
   while (1) {
     /* USER CODE END WHILE */
 
