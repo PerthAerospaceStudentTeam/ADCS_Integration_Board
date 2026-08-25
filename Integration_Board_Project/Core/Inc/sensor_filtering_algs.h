@@ -1,4 +1,4 @@
-/* define self, prevent inclusion recursion issues */
+/* define self, prevent recursive inclusion issues */
 #ifndef SENSOR_FILTERING_ALG_H
 	#define SENSOR_FILTERING_ALG_H
 
@@ -20,6 +20,9 @@
 	/* Function declarations */
 	void filter_sensor_data(int16_t data[3], Sensor_Type data_source);
 	void calculate_sensor_process_noise();
+	void update_accel_measure_rate(int16_t new_rate_Hz);
+	void update_gyro_measure_rate(int16_t new_rate_Hz);
+	void update_mag_measure_rate(int16_t new_rate_Hz);
 
 	/* Testing functions (these functions are temporarily available to other files to test independently) */
 	int16_t predict_system_state_test(int16_t data, double* k, int16_t* e, int16_t* s, int16_t p);

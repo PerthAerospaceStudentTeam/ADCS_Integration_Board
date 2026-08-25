@@ -63,16 +63,49 @@ static Sensor_Reading_Filtering accel_filtered_state = { {0.0, 0, 0}, {0.0, 0, 0
 static Sensor_Reading_Filtering gyro_filtered_state = { {0.0, 0, 0}, {0.0, 0, 0}, {0.0, 0, 0}, -1 };
 static Sensor_Reading_Filtering mag_filtered_state = { {0.0, 0, 0}, {0.0, 0, 0}, {0.0, 0, 0}, -1 };
 
+/* Simple functions for internal use which simply update internal value for each sensor's process noise*/
+static void update_accel_process_noise() { accel_filtered_state.sensor_process_noise = accel_measure_range / (int16_t)( 1.0 / (double)accel_measure_rate ); }
+static void update_gyro_process_noise() { gyro_filtered_state.sensor_process_noise = gyro_measure_range / (int16_t)( 1.0 / (double)gyro_measure_rate ); }
+static void update_mag_process_noise() { mag_filtered_state.sensor_process_noise = mag_measure_range / (int16_t)( 1.0 / (double)mag_measure_rate ); }
+
 /*
 * Function to calculate process noise for each sensor (updates sensor_process_noise in required structs)
-* Takes no params, no return value
 * Must be called at least once before data is to be read from sensors
 */
-void calculate_sensor_process_noise() {
-	/* May update function to also update measure_rate for each sensor (must read from each sensor's registers, prolly unnecessary aswell) */
-	accel_filtered_state.sensor_process_noise = accel_measure_range / (int16_t)( 1.0 / (double)accel_measure_rate );
-	gyro_filtered_state.sensor_process_noise = gyro_measure_range / (int16_t)( 1.0 / (double)gyro_measure_rate );
-	mag_filtered_state.sensor_process_noise = mag_measure_range / (int16_t)( 1.0 / (double)mag_measure_rate );
+void calculate_sensor_process_noise() {	
+	update_accel_process_noise();
+	update_gyro_process_noise();
+	update_mag_process_noise();
+}
+
+/* Functions to update measurement rate for each sensor, used if sensor reading rate is to change */
+/* ( associated sensor's process noise is automatically recalculated ) */
+
+/*
+* Function to update measurement rate (in Hz) for accelerometer, auto updates process noise for accelerometer
+* Imports: new_rate_Hz (new measurement rate of accelerometerin Hz)
+*/
+void update_accel_measure_rate(int16_t new_rate_Hz) {
+	accel_measure_rate = new_rate_Hz;
+	update_accel_process_noise();
+}
+
+/*
+* Function to update measurement rate (in Hz) for gyroscope
+* Imports: new_rate_Hz (new measurement rate of gyroscope in Hz)
+*/
+void update_gyro_measure_rate(int16_t new_rate_Hz) {
+	gyro_measure_rate = new_rate_Hz;
+	update_gyro_process_noise();
+}
+
+/*
+* Function to update measurement rate (in Hz) for magnetometer
+* Imports: new_rate_Hz (new measurement rate of magnetometer in Hz)
+*/
+void update_mag_measure_rate(int16_t new_rate_Hz) {
+	mag_measure_rate = new_rate_Hz;
+	update_mag_process_noise();
 }
 
 /*
