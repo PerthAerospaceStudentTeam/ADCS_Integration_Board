@@ -122,10 +122,10 @@ int32_t SensorWrite(void* handle, uint8_t reg, const uint8_t* bufp,
   HAL_StatusTypeDef status = HAL_ERROR;
   SPI_HandleTypeDef* spi_h = sensor_h->interface_h;
   reg &= 0x7F;  // Bit-mask to set MSB = 0 for write operation
-  status = HAL_SPI_Transmit(spi_h, &reg, 1, 10);  // Send write register
+  status = HAL_SPI_Transmit(spi_h, &reg, 1, SPI_TIMEOUT);  // Send write address
 
   if (status == HAL_OK) {
-    status = HAL_SPI_Transmit(spi_h, bufp, len, 10);  // Perform write to `reg`
+    status = HAL_SPI_Transmit(spi_h, bufp, len, SPI_TIMEOUT);  // Perform write
   }
 
   HAL_GPIO_WritePin(cs_port, cs_pin, GPIO_PIN_SET);  // Stop SPI with CS = 1
@@ -153,10 +153,10 @@ int32_t SensorRead(void* handle, uint8_t reg, uint8_t* bufp, uint16_t len) {
   HAL_StatusTypeDef status = HAL_ERROR;
   SPI_HandleTypeDef* spi_h = sensor_h->interface_h;
   reg |= 0x80;  // Bit-mask to set MSB = 1 for read operation
-  status = HAL_SPI_Transmit(spi_h, &reg, 1, 10);  // Send read register
+  status = HAL_SPI_Transmit(spi_h, &reg, 1, SPI_TIMEOUT);  // Send read address
 
   if (status == HAL_OK) {
-    status = HAL_SPI_Receive(spi_h, bufp, len, 10);  // Perform write to `reg`
+    status = HAL_SPI_Receive(spi_h, bufp, len, SPI_TIMEOUT);  // Perform write
   }
 
   HAL_GPIO_WritePin(cs_port, cs_pin, GPIO_PIN_SET);  // Stop SPI with CS = 1
@@ -322,9 +322,9 @@ int main(void) {
 
   // gyro bias reduction
   lsm6dso_angular_rate_raw_get(&IMU_ctx, raw_gyro);
-//  gyro_intermediate[0] = raw_gyro_to_degreespersecond(raw_gyro[0]);
-//  gyro_intermediate[1] = -raw_gyro_to_degreespersecond(raw_gyro[1]);
-//  gyro_intermediate[2] = raw_gyro_to_degreespersecond(raw_gyro[2]);
+  //  gyro_intermediate[0] = raw_gyro_to_degreespersecond(raw_gyro[0]);
+  //  gyro_intermediate[1] = -raw_gyro_to_degreespersecond(raw_gyro[1]);
+  //  gyro_intermediate[2] = raw_gyro_to_degreespersecond(raw_gyro[2]);
   float sumx = 0.0f, sumy = 0.0f, sumz = 0.0f;
   char waiting[] = "Calibrating offset values";
   HAL_UART_Transmit(&huart1, (uint8_t*)waiting, strlen(waiting), 100);
