@@ -27,11 +27,19 @@
 
 #include "iis2mdc_reg.h"
 #include "lsm6dso_reg.h"
+#include "stm32h7xx_hal_def.h"
 
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
 /* USER CODE BEGIN PTD */
+
+// Handle for organising sensor interface information for read/write operations
+typedef struct {
+  void* handle;           // Interface handle e.g. `SPI_HandleTypeDef`
+  GPIO_TypeDef* CS_Port;  // Sensor's chip select port
+  uint16_t CS_Pin;        // Sensor's chip select pin in `CS_Port`
+} Sensor_HandleTypeDef;
 
 /* USER CODE END PTD */
 
@@ -80,123 +88,79 @@ static void MX_ADC1_Init(void);
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
 
-stmdev_ctx_t lsm6dso_ctx;
-stmdev_ctx_t iis2mdc_ctx;
-
-/* ---------------------- COMMUNICATION FUNCTIONS ----------------------------
- * Functions should not handle failed write operation itself (i.e. loop until
- * success), this should be responsibility of calling function. All possible
- * return values of functions correspond to COMMUNICATION_... macros defined
- * in main.h
- */
-
-/** LSM6DSO IMU --------------------------------------------------------------
- * Notes:
- *  LSM6DSO using SPI1
- *  CS = PB4
+/** Sensor Notes ---------------------------------------------------------------
+ * LSM6DSO IMU
+ * - Uses SPI1
+ * - CS = PB4
+ * - Automatically increments through registers for multiple consecutive
+ *   read/write operations if register CTRL3_C[2] = 1 (set to 1 by default)
+ *
+ * IIS2MDC MAG
+ * - Uses SPI2
+ * - CS = PB2
  */
 
 /**
- * Uses the SPI interface defined by `handle` to write `len` bytes from the
- * data buffer `bufp` to the LSM6DSO register `reg`.
- *
- * Writes multiple bytes to consecutive registers starting at `reg` only
- * if LSM6DSO register CTRL3_C[2] = 1 (default). Otherwise multiple write
- * operations are performed on `reg`.
+ * Uses the SPI interface defined in `sensor_h->handle` to write `len` bytes
+ * from the data buffer `bufp` starting from the sensor register `reg`.
  *
  * Inputs:
- * `handle`:  pointer to the SPI interface handle of type `SPI_HandleTypeDef`
- * `reg`:     initial write register address byte. MSB set to 0 for write
- * `bufp`:    pointer to the data buffer
- * `len`:     number of bytes to write
+ * `sensor_h`:  pointer to the sensor handle (`Sensor_HandleTypeDef`)
+ * `reg`:       initial write register address byte. MSB is internally set to 0
+ * `bufp`:      pointer to the data buffer
+ * `len`:       number of bytes to write
  *
- * Output:    status of write operation
+ * Output:      write operation status (0 = success)
  */
-int32_t IMU_Write(void* handle, uint8_t reg, const uint8_t* bufp,
-                  uint16_t len) {
-  HAL_StatusTypeDef write_status = HAL_ERROR;
+int32_t SensorWrite(void* sensor_h, uint8_t reg, const uint8_t* bufp,
+                    uint16_t len) {
+  Sensor_HandleTypeDef* sensor = (Sensor_HandleTypeDef*)sensor_h;
+  GPIO_TypeDef* cs_port = sensor->CS_Port;
+  uint16_t cs_pin = sensor->CS_Pin;
+  HAL_GPIO_WritePin(cs_port, cs_pin, GPIO_PIN_RESET);  // Start SPI with CS = 0
 
-  HAL_GPIO_WritePin(IMU_CS_Port, IMU_CS_Pin, GPIO_PIN_RESET);  // Start SPI
-  reg &= 0x7F;  // Set MSB = 0 for write operation
-  write_status = HAL_SPI_Transmit(handle, &reg, 1, 10);  // Send write register
-  if (write_status == HAL_OK) {
-    write_status = HAL_SPI_Transmit(handle, bufp, len, 10);  // Perform write
+  HAL_StatusTypeDef status = HAL_ERROR;
+  SPI_HandleTypeDef* handle = sensor->handle;
+  reg &= 0x7F;  // Bit-mask to set MSB = 0 for write operation
+  status = HAL_SPI_Transmit(handle, &reg, 1, 10);  // Send write register
+
+  if (status == HAL_OK) {
+    status = HAL_SPI_Transmit(handle, bufp, len, 10);  // Perform write to `reg`
   }
 
-  HAL_GPIO_WritePin(IMU_CS_Port, IMU_CS_Pin, GPIO_PIN_SET);  // Stop SPI
-  return write_status;
+  HAL_GPIO_WritePin(cs_port, cs_pin, GPIO_PIN_SET);  // Stop SPI with CS = 1
+  return status;
 }
 
 /**
- * Uses the SPI interface defined by `handle` to read `len` bytes from the
- * the LSM6DSO register `reg` into the data buffer `bufp`.
- *
- * Reads multiple bytes from consecutive registers starting at `reg` only
- * if LSM6DSO register CTRL3_C[2] = 1 (default). Otherwise multiple read
- * operations are performed on `reg`.
+ * Uses the SPI interface defined in `sensor_h->handle` to read `len` bytes
+ * starting from the the sensor register `reg` into the data buffer `bufp`.
  *
  * Inputs:
- * `handle`:  pointer to the SPI interface handle of type `SPI_HandleTypeDef`
- * `reg`:     initial read register address byte. MSB set to 1 for read
- * `bufp`:    pointer to the data buffer
- * `len`:     number of bytes to read
+ * `sensor_h`:  pointer to the sensor handle (`Sensor_HandleTypeDef`)
+ * `reg`:       initial read register address byte. MSB internally set to 1
+ * `bufp`:      pointer to the data buffer
+ * `len`:       number of bytes to read
  *
- * Output:    status of read operation
+ * Output:      read operation status (0 = success)
  */
-int32_t IMU_Read(void* handle, uint8_t reg, uint8_t* bufp, uint16_t len) {
-  HAL_StatusTypeDef read_status = HAL_ERROR;
+int32_t SensorRead(void* sensor_h, uint8_t reg, uint8_t* bufp, uint16_t len) {
+  Sensor_HandleTypeDef* sensor = (Sensor_HandleTypeDef*)sensor_h;
+  GPIO_TypeDef* cs_port = sensor->CS_Port;
+  uint16_t cs_pin = sensor->CS_Pin;
+  HAL_GPIO_WritePin(cs_port, cs_pin, GPIO_PIN_RESET);  // Start SPI with CS = 0
 
-  HAL_GPIO_WritePin(IMU_CS_Port, IMU_CS_Pin, GPIO_PIN_RESET);  // Start SPI
-  reg |= 0x80;  // Set MSB = 1 for read operation
-  read_status = HAL_SPI_Transmit(handle, &reg, 1, 10);  // Send read register
-  if (read_status == HAL_OK) {
-    read_status = HAL_SPI_Receive(handle, bufp, len, 10);  // Perform read
+  HAL_StatusTypeDef status = HAL_ERROR;
+  SPI_HandleTypeDef* handle = sensor->handle;
+  reg |= 0x80;  // Bit-mask to set MSB = 1 for read operation
+  status = HAL_SPI_Transmit(handle, &reg, 1, 10);  // Send read register
+
+  if (status == HAL_OK) {
+    status = HAL_SPI_Receive(handle, bufp, len, 10);  // Perform write to `reg`
   }
 
-  HAL_GPIO_WritePin(IMU_CS_Port, IMU_CS_Pin, GPIO_PIN_SET);  // Stop SPI
-  return read_status;
-}
-
-/* ---------------------------- IIS2MDC MAG ----------------------------------
- * Notes:
- *  IIS2MDC using SPI2
- *  CS = PB2
- */
-int32_t MAG_Write(void* handle, uint8_t reg, const uint8_t* bufp,
-                  uint16_t len) {
-  int32_t write_status = COMMUNICATION_ERROR;
-
-  // Set CS = LOW to start communication
-  HAL_GPIO_WritePin(MAG_CS_GPIO_Port, MAG_CS_Pin, GPIO_PIN_RESET);
-
-  // Attempt SPI write
-  reg &= 0x7F;  // Set bit-0 = LOW for write
-  write_status = HAL_SPI_Transmit(&hspi2, &reg, 1, HAL_MAX_DELAY);
-  if (write_status == COMMUNICATION_SUCCESS) {
-    write_status = HAL_SPI_Transmit(&hspi2, (uint8_t*)bufp, len, HAL_MAX_DELAY);
-  }
-
-  // Set CS = HIGH to end communication
-  HAL_GPIO_WritePin(MAG_CS_GPIO_Port, MAG_CS_Pin, GPIO_PIN_SET);
-  return write_status;
-}
-
-int32_t MAG_Read(void* handle, uint8_t reg, uint8_t* bufp, uint16_t len) {
-  int32_t read_status = COMMUNICATION_ERROR;
-
-  // Set CS = LOW to start communication
-  HAL_GPIO_WritePin(MAG_CS_GPIO_Port, MAG_CS_Pin, GPIO_PIN_RESET);
-
-  // Attempt SPI read
-  reg |= 0x80;
-  read_status = HAL_SPI_Transmit(&hspi2, &reg, 1, HAL_MAX_DELAY);
-  if (read_status == COMMUNICATION_SUCCESS) {
-    read_status = HAL_SPI_Receive(&hspi2, bufp, len, HAL_MAX_DELAY);
-  }
-
-  // Set CS = HIGH to end communication
-  HAL_GPIO_WritePin(MAG_CS_GPIO_Port, MAG_CS_Pin, GPIO_PIN_SET);
-  return read_status;
+  HAL_GPIO_WritePin(cs_port, cs_pin, GPIO_PIN_SET);  // Stop SPI with CS = 1
+  return status;
 }
 
 /* Conversion helper */
@@ -269,15 +233,27 @@ int main(void) {
   MX_ADC1_Init();
 
   /* USER CODE BEGIN 2 */
-  // LSM6DSO initialize
-  lsm6dso_ctx.write_reg = IMU_Write;
-  lsm6dso_ctx.read_reg = IMU_Read;
-  lsm6dso_ctx.handle = &hspi1;
+  // Initialise LSM6DSO Inertial Measurement Unit
+  Sensor_HandleTypeDef hIMU;
+  hIMU.handle = &hspi1;
+  hIMU.CS_Port = IMU_CS_GPIO_Port;
+  hIMU.CS_Pin = IMU_CS_Pin;
 
-  // IIS2MDC initialize
-  iis2mdc_ctx.write_reg = MAG_Write;
-  iis2mdc_ctx.read_reg = MAG_Read;
-  iis2mdc_ctx.handle = &hspi2;
+  stmdev_ctx_t lsm6dso_ctx;
+  lsm6dso_ctx.write_reg = SensorWrite;
+  lsm6dso_ctx.read_reg = SensorRead;
+  lsm6dso_ctx.handle = &hIMU;
+
+  // Initialise IIS2MDC magnetometer handle
+  Sensor_HandleTypeDef hMAG;
+  hMAG.handle = &hspi2;
+  hMAG.CS_Port = MAG_CS_GPIO_Port;
+  hMAG.CS_Pin = MAG_CS_Pin;
+
+  stmdev_ctx_t iis2mdc_ctx;
+  iis2mdc_ctx.write_reg = SensorWrite;
+  iis2mdc_ctx.read_reg = SensorRead;
+  iis2mdc_ctx.handle = &hMAG;
 
   /* -------- LSM6DSO INIT -------- */
   lsm6dso_spi_mode_set(
@@ -296,7 +272,7 @@ int main(void) {
 
   // WHOAMI
   uint8_t VALUE = 0;
-  IMU_Read(NULL, 0x0F, &VALUE, 1);
+  //  IMU_Read(NULL, 0x0F, &VALUE, 1);
 
   // testing to check if i can comm with the imu
   char string[32];
