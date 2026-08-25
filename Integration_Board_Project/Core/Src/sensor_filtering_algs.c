@@ -25,7 +25,7 @@ static int16_t accel_measure_rate = 833;
 static int16_t gyro_measure_rate = 833;
 static int16_t mag_measure_rate = 100;
 
-/* variables storing estimated maximum measurement */
+/* variables storing estimated maximum measurement, currently placeholder, actualvariation will very likely be unique for each sensor */
 static int16_t accel_measure_range = PLACEHOLDER_MEASUREMENT_VARIATION;
 static int16_t gyro_measure_range = PLACEHOLDER_MEASUREMENT_VARIATION;
 static int16_t mag_measure_range = PLACEHOLDER_MEASUREMENT_VARIATION;
@@ -91,7 +91,7 @@ void update_accel_measure_rate(int16_t new_rate_Hz) {
 }
 
 /*
-* Function to update measurement rate (in Hz) for gyroscope
+* Function to update measurement rate (in Hz) for gyroscope, auto updates process noise for gyroscope
 * Imports: new_rate_Hz (new measurement rate of gyroscope in Hz)
 */
 void update_gyro_measure_rate(int16_t new_rate_Hz) {
@@ -100,7 +100,7 @@ void update_gyro_measure_rate(int16_t new_rate_Hz) {
 }
 
 /*
-* Function to update measurement rate (in Hz) for magnetometer
+* Function to update measurement rate (in Hz) for magnetometer, auto updates process noise for magnetometer
 * Imports: new_rate_Hz (new measurement rate of magnetometer in Hz)
 */
 void update_mag_measure_rate(int16_t new_rate_Hz) {
@@ -110,8 +110,9 @@ void update_mag_measure_rate(int16_t new_rate_Hz) {
 
 /*
 * Function to filter fixed bias from raw sensor readings
-* Imports reference to int array (expects array of length 3, [0]=x, [1]=y, [2]=z)
-* Imports enum type indicating which sensor raw data is from
+* Imports: 
+* 	-data (int16_t[3]): raw data to have fixed bias removed ([0]=x, [1]=y, [2]=z)
+* 	-data_source (Sensor_Type): enum type indicating which sensor raw data is from
 * Updates imported data to filtered version of data
 */
 void filter_fixed_bias(int16_t data[3], Sensor_Type data_source) {
@@ -145,7 +146,9 @@ void filter_fixed_bias(int16_t data[3], Sensor_Type data_source) {
 
 /*
 * Algorithm to calculate the Kalman gain, (determines the 'strength' given to new measurements)
-* imports: p (representing extrapolated variance estimation), r (representing variance in current measurement)
+* imports: 
+* 	-p (int16_t):  representing extrapolated variance estimation
+* 	-r (int16_t): representing variance in current measurement
 * exports: new value of kalman gain (K), 0.0 <= K <= 1.0
  */
 static double calculate_kalman_gain(int16_t p, int16_t r) {
@@ -155,7 +158,10 @@ static double calculate_kalman_gain(int16_t p, int16_t r) {
 
 /*
 * Algorithm to calculate variance_in_estimation (p), determines the variance in current state prediction from prev.
-* imports: k (representing kalman gain), p (previous variance_in_estimation), n (process noise)
+* imports: 
+* 	-k (double): representing kalman gain
+* 	-p (int16_t): previous variance_in_estimation
+* 	-n (int16_t): process noise
 * exports: new value for variance_in_estimation
 */
 static int16_t calculate_estimate_variation(double k, int16_t p, int16_t n) {
@@ -163,8 +169,11 @@ static int16_t calculate_estimate_variation(double k, int16_t p, int16_t n) {
 }
 
 /*
-* Algorithm to calculate current state_estimation, actually
-* imports: x (Previous state_estimation), k (kalman gain), z (measured system state)
+* Algorithm to calculate current state_estimation (filtered measurement) using previous state estimation, kalman gain and new measurement
+* imports: 
+* 	-x (int16_t): Previous state_estimation
+* 	-k (double): kalman gain
+* 	-z (int16_t): measured system state
 * exports: current estimation for state (i.e. filtered measurement for sensor reading)
 */
 static int16_t calculate_state_estimation(int16_t x, double k, int16_t z) {
@@ -173,7 +182,10 @@ static int16_t calculate_state_estimation(int16_t x, double k, int16_t z) {
 
 /*
 * Function used to combine kalman state estimation filtering algorithms into single filtering operation for a single data reading
-* imports data (new measurement to be filtered), state_predict_vars (reference to struct containing appropriate variables to apply state prediction), process_noise (process noise of sensor)
+* imports: 
+* 	-data (int16_t): new measurement to be filtered
+* 	-state_predict_vars (State_Prediction_Variables*): reference to struct containing appropriate variables to apply state prediction
+* 	-process_noise (int16_t): process noise of sensor
 * Updates values stored within state_predict_vars to reflect new state prediction variables (state_predict_vars->state_estimation is filtered data)
 * Exports: value of state_predict_vars->state_estimation after prediction occurs
 */
@@ -193,7 +205,12 @@ int16_t predict_system_state(int16_t data, State_Prediction_Variables* state_pre
 
 /*
 * Function used to test kalman state estimation filtering algorithm, modified to be used by external files (i.e. does not import struct specific to this file)
-* Imports data (new measurement), k (kalman gain), e (estimation variation), s (state estimation), p (process noise)
+* Imports:
+* 	-data (int16_t): new measurement
+* 	-k (double*): pointer to kalman gain
+* 	-e (int16_t*): pointer to estimation variation
+* 	-s (int16_t*): pointer to state estimation
+* 	-p (int16_t): process noise
 * Exports new data (after filtering applied)
 */
 int16_t predict_system_state_test(int16_t data, double* k, int16_t* e, int16_t* s, int16_t p) {
@@ -212,7 +229,9 @@ int16_t predict_system_state_test(int16_t data, double* k, int16_t* e, int16_t* 
 
 /*
 * Function to apply kalman state estimation filtering for x, y, z readings from sensor
-* imports data (1D Array of 3 ints represnting data to be filtered), data_source (used to apply and update correct state prediction variables)
+* imports:
+* 	-data (int16_t[3]): 1D Array of 3 ints representing data to be filtered
+* 	-data_source (Sensor_Type): used to apply and update correct state prediction variables
 * updates each value in imported array to reflect predicted state for that value after kalman state estimation function applied
 */
 void kalman_state_estimation(int16_t data[3], Sensor_Type data_source) {
@@ -239,8 +258,11 @@ void kalman_state_estimation(int16_t data[3], Sensor_Type data_source) {
 
 /*
 * Function used to filter x, y, z data from a particular sensor
-* Imports: data (1D Array of 3 ints represnting data to be filtered), data_source (used to apply and update correct state prediction variables)
-* Updates imported data so that values stored in array represent new, filtered data fater fixed bias and instability/stability biases are removed
+* ASSUMES: process noise has been calculated for each sensor (i.e. invoked calculate_sensor_process_noise() before calling this function)
+* Imports:
+* 	-data (int16_t[3]): 1D Array of 3 ints representing data to be filtered
+* 	-data_source (Sensor_Type): used to apply and update correct state prediction variables
+* Updates imported data so that values stored in array represent new, filtered data after fixed bias and instability/stability biases are removed
 */
 void filter_sensor_data(int16_t data[3], Sensor_Type data_source) {
 	//First filter fixed biases from readings, then apply kalman filtering for instability/stability random biases
