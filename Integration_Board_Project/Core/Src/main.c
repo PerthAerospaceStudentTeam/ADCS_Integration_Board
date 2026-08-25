@@ -295,7 +295,7 @@ int main(void) {
   /* Variables */
   int16_t raw_accel[3];
   float accel_mss[3];
-  char accel_data[64];
+  char accel_data_str[64];
   volatile char gyro_data[64];
   float G_X_roll = 0.0f;
   float G_Y_pitch = 0.0f;
@@ -307,7 +307,7 @@ int main(void) {
   float dt = 0.0f;
   char sun_data_str[100];
 
-  uint32_t last_tick = HAL_GetTick();
+  uint32_t prev_tick = HAL_GetTick();
 
   /* USER CODE END 2 */
 
@@ -319,56 +319,42 @@ int main(void) {
     /* USER CODE BEGIN 3 */
     HAL_Delay(500);
 
-    // Code to display raw data from sensors in the form of 2^16 - 1
+    // Sun sensor data reporting
     if (sun_ready == 1) {
       sun_ready = 0;
-      sprintf(sun_data_str,
-              "-Z = %u, +Z = %u, -X = %u, +X = %u, -Y = % u, +Y = % u\n",
-              sun[0], sun[1], sun[2], sun[3], sun[4], sun[5]);
+      sprintf(
+          sun_data_str,
+          "Sun sensors: -Z = %u, +Z = %u, -X = %u, +X = %u, -Y = %u, +Y = %u\n",
+          sun[0], sun[1], sun[2], sun[3], sun[4], sun[5]);
       HAL_UART_Transmit(&huart1, (uint8_t*)sun_data_str, strlen(sun_data_str),
                         HAL_MAX_DELAY);
     }
 
-    //	  uint16_t SUN_Zp = sun[0]; //this block can be deleted
-    //	  uint16_t SUN_Xm = sun[1];
-    //	  sprintf(sun_outputs, "Z Positive: %u, X Negative: %u \r\n ",
-    // SUN_Zp,
-    // SUN_Xm); 	  HAL_UART_Transmit(&huart1,(uint8_t*)sun_outputs,
-    // strlen(sun_outputs), HAL_MAX_DELAY); 	  HAL_Delay(500);
+    
+    // IMU acceleration data reporting
+    lsm6dso_acceleration_raw_get(&IMU_ctx, raw_accel);
+    
+    accel_mss[0] = lsm6dso_from_fs2_to_mg(raw_accel[0]);
+    accel_mss[1] = lsm6dso_from_fs2_to_mg(raw_accel[1]);
+    accel_mss[2] = lsm6dso_from_fs2_to_mg(raw_accel[2]);
+    
+    sprintf(accel_data_str, "m/s^2: X=%.2f, Y=%.2f, Z=%.2f\n", accel_mss[1],
+      -accel_mss[0], accel_mss[2]);
+      HAL_UART_Transmit(&huart1, (uint8_t*)accel_data_str, strlen(accel_data_str),
+      HAL_MAX_DELAY);
+      
+    // // getting dt from integrating gyro
+    // uint32_t curr_tick = HAL_GetTick();
+    // float dt = (curr_tick - prev_tick) / 1000.0f;
+    // prev_tick = curr_tick;
 
-    //	  HAL_ADC_Start(&hadc1); //this block can be deleted
-    //	  HAL_ADC_PollForConversion(&hadc1, 100);
-    //	  sun_Zp = HAL_ADC_GetValue(&hadc1);
-    //	  sprintf(sun_output, "Sun: %u \r\n ", sun_Zp);
-    //	  HAL_UART_Transmit(&huart1, (uint8_t*)sun_output,
-    // strlen(sun_output),
-    // HAL_MAX_DELAY); 	  HAL_Delay(500);
+    // // IMU gyroscope data reporting
+    // lsm6dso_angular_rate_raw_get(&lsm6dso_ctx, raw_gyro);
 
-    //  	//getting dt from integrating gyro
-    //  	uint32_t now = HAL_GetTick();
-    //  	float dt = (now - last_tick	) / 1000.0f;
-    //  	last_tick = now;
-    //
-    //  	//accelerometer
-    //      lsm6dso_acceleration_raw_get(&lsm6dso_ctx, raw_accel);
-    //
-    //      accel_mss[0] = raw_accel_to_mss(raw_accel[0]);
-    //      accel_mss[1] = raw_accel_to_mss(raw_accel[1]);
-    //      accel_mss[2] = raw_accel_to_mss(raw_accel[2]);
-    //
-    //      snprintf(accel_data, sizeof(accel_data), "Accel X=%.2f Y=%.2f
-    //      Z=%.2f\r\n", accel_mss[1], -accel_mss[0], accel_mss[2]);
-    //      HAL_UART_Transmit(&huart1, (uint8_t *)accel_data,
-    //      strlen(accel_data), HAL_MAX_DELAY);
-    //
-    //      //gyro
-    //      lsm6dso_angular_rate_raw_get(&lsm6dso_ctx, raw_gyro);
-    //
-    //      gyro_intermediate[0]= raw_gyro_to_degreespersecond(raw_gyro[0])
-    //      -offset_x ; gyro_intermediate[1]=
-    //      -raw_gyro_to_degreespersecond(raw_gyro[1]) - offset_y ;
-    //      gyro_intermediate[2]= raw_gyro_to_degreespersecond(raw_gyro[2]) -
-    //      offset_z;
+    // gyro_intermediate[0] = raw_gyro_to_degreespersecond(raw_gyro[0]) - offset_x;
+    // gyro_intermediate[1] =
+    //     -raw_gyro_to_degreespersecond(raw_gyro[1]) - offset_y;
+    // gyro_intermediate[2] = raw_gyro_to_degreespersecond(raw_gyro[2]) - offset_z;
     ////        snprintf(gyro_data, sizeof(gyro_data), "GYRO X=%.2f Y=%.2f
     /// Z=%.2f \r\n", gyro_intermediate[0], gyro_intermediate[1],
     /// gyro_intermediate[2]); /        HAL_UART_Transmit(&huart1, (uint8_t
@@ -384,8 +370,8 @@ int main(void) {
     //
     //     // loop for magnetometer data
     //      iis2mdc_magnetic_raw_get(&iis2mdc_ctx, raw_mag);
-    //      sprintf(mag_data, "MAG DATA  X: %i Y: %i Z: %i \r\n", raw_mag[0],
-    //      raw_mag[1], raw_mag[2]); HAL_UART_Transmit(&huart1,
+    //      sprintf(mag_data, "MAG DATA  X: %i Y: %i Z: %i \r\n",
+    //      raw_mag[0], raw_mag[1], raw_mag[2]); HAL_UART_Transmit(&huart1,
     //      (uint8_t*)mag_data, strlen(mag_data), HAL_MAX_DELAY);
     //      HAL_Delay(10);
   }
