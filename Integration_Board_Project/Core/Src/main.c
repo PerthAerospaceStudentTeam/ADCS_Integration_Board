@@ -36,9 +36,9 @@
 
 // Handle for organising sensor interface information for read/write operations
 typedef struct {
-  void* handle;           // Interface handle e.g. `SPI_HandleTypeDef`
-  GPIO_TypeDef* CS_Port;  // Sensor's chip select port
-  uint16_t CS_Pin;        // Sensor's chip select pin in `CS_Port`
+  void* interface_h;      // Interface handle e.g. `SPI_HandleTypeDef`
+  GPIO_TypeDef* cs_port;  // Chip select port
+  uint16_t cs_pin;        // Chip select pin in `CS_Port`
 } Sensor_HandleTypeDef;
 
 /* USER CODE END PTD */
@@ -112,20 +112,20 @@ static void MX_ADC1_Init(void);
  *
  * Output:      write operation status (0 = success)
  */
-int32_t SensorWrite(void* sensor_h, uint8_t reg, const uint8_t* bufp,
+int32_t SensorWrite(void* handle, uint8_t reg, const uint8_t* bufp,
                     uint16_t len) {
-  Sensor_HandleTypeDef* sensor = (Sensor_HandleTypeDef*)sensor_h;
-  GPIO_TypeDef* cs_port = sensor->CS_Port;
-  uint16_t cs_pin = sensor->CS_Pin;
+  Sensor_HandleTypeDef* sensor_h = (Sensor_HandleTypeDef*)handle;
+  GPIO_TypeDef* cs_port = sensor_h->cs_port;
+  uint16_t cs_pin = sensor_h->cs_pin;
   HAL_GPIO_WritePin(cs_port, cs_pin, GPIO_PIN_RESET);  // Start SPI with CS = 0
 
   HAL_StatusTypeDef status = HAL_ERROR;
-  SPI_HandleTypeDef* handle = sensor->handle;
+  SPI_HandleTypeDef* spi_h = sensor_h->interface_h;
   reg &= 0x7F;  // Bit-mask to set MSB = 0 for write operation
-  status = HAL_SPI_Transmit(handle, &reg, 1, 10);  // Send write register
+  status = HAL_SPI_Transmit(spi_h, &reg, 1, 10);  // Send write register
 
   if (status == HAL_OK) {
-    status = HAL_SPI_Transmit(handle, bufp, len, 10);  // Perform write to `reg`
+    status = HAL_SPI_Transmit(spi_h, bufp, len, 10);  // Perform write to `reg`
   }
 
   HAL_GPIO_WritePin(cs_port, cs_pin, GPIO_PIN_SET);  // Stop SPI with CS = 1
@@ -144,33 +144,23 @@ int32_t SensorWrite(void* sensor_h, uint8_t reg, const uint8_t* bufp,
  *
  * Output:      read operation status (0 = success)
  */
-int32_t SensorRead(void* sensor_h, uint8_t reg, uint8_t* bufp, uint16_t len) {
-  Sensor_HandleTypeDef* sensor = (Sensor_HandleTypeDef*)sensor_h;
-  GPIO_TypeDef* cs_port = sensor->CS_Port;
-  uint16_t cs_pin = sensor->CS_Pin;
+int32_t SensorRead(void* handle, uint8_t reg, uint8_t* bufp, uint16_t len) {
+  Sensor_HandleTypeDef* sensor_h = (Sensor_HandleTypeDef*)handle;
+  GPIO_TypeDef* cs_port = sensor_h->cs_port;
+  uint16_t cs_pin = sensor_h->cs_pin;
   HAL_GPIO_WritePin(cs_port, cs_pin, GPIO_PIN_RESET);  // Start SPI with CS = 0
 
   HAL_StatusTypeDef status = HAL_ERROR;
-  SPI_HandleTypeDef* handle = sensor->handle;
+  SPI_HandleTypeDef* spi_h = sensor_h->interface_h;
   reg |= 0x80;  // Bit-mask to set MSB = 1 for read operation
-  status = HAL_SPI_Transmit(handle, &reg, 1, 10);  // Send read register
+  status = HAL_SPI_Transmit(spi_h, &reg, 1, 10);  // Send read register
 
   if (status == HAL_OK) {
-    status = HAL_SPI_Receive(handle, bufp, len, 10);  // Perform write to `reg`
+    status = HAL_SPI_Receive(spi_h, bufp, len, 10);  // Perform write to `reg`
   }
 
   HAL_GPIO_WritePin(cs_port, cs_pin, GPIO_PIN_SET);  // Stop SPI with CS = 1
   return status;
-}
-
-/* Conversion helper */
-float raw_accel_to_mss(int16_t raw) {
-  return (float)raw * 0.00059f;  // Data sheet conversion of 0.00061 overshoots
-}
-
-float raw_gyro_to_degreespersecond(int16_t raw) {
-  return raw *
-         0.00875f;  // value from data sheet -- angular rate sensitivity type
 }
 
 // interrupt handler to ensure smooth ADC readings
@@ -182,9 +172,9 @@ void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef* hadc) { ADC_Finished = 1; }
 int maxIntensity[6];  // Maximum sensor values
 int minIntensity[6];  // Minimum sensor values
 void resetCalibration() {
-  for (int i = 0; i < 6; i++) {
-    maxIntensity[i] = 0;
-    minIntensity[i] = 65535;  // 12-bit ADC range
+  for (int i = 0; i <= 5; i++) {
+    maxIntensity[i] = 0U;
+    minIntensity[i] = 0xFFFFU;  // 16-bit max of ADC range
   }
   char SUN_Calibration[] = "Calibration Of ADC Sun Sensors";
   HAL_UART_Transmit(&huart1, (uint8_t*)SUN_Calibration, strlen(SUN_Calibration),
@@ -233,42 +223,40 @@ int main(void) {
   MX_ADC1_Init();
 
   /* USER CODE BEGIN 2 */
-  // Initialise LSM6DSO Inertial Measurement Unit
-  Sensor_HandleTypeDef hIMU;
-  hIMU.handle = &hspi1;
-  hIMU.CS_Port = IMU_CS_GPIO_Port;
-  hIMU.CS_Pin = IMU_CS_Pin;
 
-  stmdev_ctx_t lsm6dso_ctx;
-  lsm6dso_ctx.write_reg = SensorWrite;
-  lsm6dso_ctx.read_reg = SensorRead;
-  lsm6dso_ctx.handle = &hIMU;
+  // Initialise LSM6DSO Inertial Measurement Unit handle
+  Sensor_HandleTypeDef IMU_h;
+  IMU_h.interface_h = &hspi1;
+  IMU_h.cs_port = IMU_CS_GPIO_Port;
+  IMU_h.cs_pin = IMU_CS_Pin;
+
+  stmdev_ctx_t IMU_ctx;
+  IMU_ctx.write_reg = SensorWrite;
+  IMU_ctx.read_reg = SensorRead;
+  IMU_ctx.handle = &IMU_h;
 
   // Initialise IIS2MDC magnetometer handle
-  Sensor_HandleTypeDef hMAG;
-  hMAG.handle = &hspi2;
-  hMAG.CS_Port = MAG_CS_GPIO_Port;
-  hMAG.CS_Pin = MAG_CS_Pin;
+  Sensor_HandleTypeDef MAG_h;
+  MAG_h.interface_h = &hspi2;
+  MAG_h.cs_port = MAG_CS_GPIO_Port;
+  MAG_h.cs_pin = MAG_CS_Pin;
 
-  stmdev_ctx_t iis2mdc_ctx;
-  iis2mdc_ctx.write_reg = SensorWrite;
-  iis2mdc_ctx.read_reg = SensorRead;
-  iis2mdc_ctx.handle = &hMAG;
+  stmdev_ctx_t MAG_ctx;
+  MAG_ctx.write_reg = SensorWrite;
+  MAG_ctx.read_reg = SensorRead;
+  MAG_ctx.handle = &MAG_h;
 
   /* -------- LSM6DSO INIT -------- */
-  lsm6dso_spi_mode_set(
-      &lsm6dso_ctx,
-      LSM6DSO_SPI_3_WIRE);  // using the stm32 lsm6dso library and should use
-                            // this to work with 3 wire mode
-  lsm6dso_auto_increment_set(&lsm6dso_ctx, 1);
-  lsm6dso_xl_data_rate_set(&lsm6dso_ctx, LSM6DSO_XL_ODR_833Hz);
-  lsm6dso_block_data_update_set(&lsm6dso_ctx, 1);
-  lsm6dso_gy_full_scale_set(&lsm6dso_ctx, LSM6DSO_250dps);
-  lsm6dso_gy_data_rate_set(&lsm6dso_ctx, LSM6DSO_GY_ODR_833Hz);
+  lsm6dso_spi_mode_set(&IMU_ctx, LSM6DSO_SPI_3_WIRE);
+  lsm6dso_auto_increment_set(&IMU_ctx, 1);
+  lsm6dso_xl_data_rate_set(&IMU_ctx, LSM6DSO_XL_ODR_833Hz);
+  lsm6dso_block_data_update_set(&IMU_ctx, 1);
+  lsm6dso_gy_full_scale_set(&IMU_ctx, LSM6DSO_250dps);
+  lsm6dso_gy_data_rate_set(&IMU_ctx, LSM6DSO_GY_ODR_833Hz);
 
   /* -----iis2mdc INIT ----- */
-  iis2mdc_data_rate_set(&iis2mdc_ctx, IIS2MDC_ODR_100Hz);
-  iis2mdc_block_data_update_set(&iis2mdc_ctx, 1);
+  iis2mdc_data_rate_set(&MAG_ctx, IIS2MDC_ODR_100Hz);
+  iis2mdc_block_data_update_set(&MAG_ctx, 1);
 
   // WHOAMI
   uint8_t VALUE = 0;
@@ -280,7 +268,7 @@ int main(void) {
   HAL_UART_Transmit(&huart1, (uint8_t*)string, strlen(string), HAL_MAX_DELAY);
 
   uint8_t whoami = 0;
-  iis2mdc_device_id_get(&iis2mdc_ctx, &whoami);
+  iis2mdc_device_id_get(&MAG_ctx, &whoami);
 
   char msg[32];
   sprintf(msg, "IIS2MDC WHO_AM_I = 0x%02X\r\n", whoami);
@@ -333,10 +321,10 @@ int main(void) {
   __HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_2, 123);
 
   // gyro bias reduction
-  lsm6dso_angular_rate_raw_get(&lsm6dso_ctx, raw_gyro);
-  gyro_intermediate[0] = raw_gyro_to_degreespersecond(raw_gyro[0]);
-  gyro_intermediate[1] = -raw_gyro_to_degreespersecond(raw_gyro[1]);
-  gyro_intermediate[2] = raw_gyro_to_degreespersecond(raw_gyro[2]);
+  lsm6dso_angular_rate_raw_get(&IMU_ctx, raw_gyro);
+//  gyro_intermediate[0] = raw_gyro_to_degreespersecond(raw_gyro[0]);
+//  gyro_intermediate[1] = -raw_gyro_to_degreespersecond(raw_gyro[1]);
+//  gyro_intermediate[2] = raw_gyro_to_degreespersecond(raw_gyro[2]);
   float sumx = 0.0f, sumy = 0.0f, sumz = 0.0f;
   char waiting[] = "Calibrating offset values";
   HAL_UART_Transmit(&huart1, (uint8_t*)waiting, strlen(waiting), 100);
