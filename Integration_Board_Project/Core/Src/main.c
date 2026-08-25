@@ -66,7 +66,7 @@ TIM_HandleTypeDef htim3;
 UART_HandleTypeDef huart1;
 
 /* USER CODE BEGIN PV */
-int ADC_Finished = 0;
+int sun_ready = 0;
 
 /* USER CODE END PV */
 
@@ -165,9 +165,9 @@ int32_t SensorRead(void* handle, uint8_t reg, uint8_t* bufp, uint16_t len) {
 }
 
 /*
- * User defined ADC interrupt handler for callbacks 
+ * User defined ADC interrupt handler for callbacks
  */
-void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef* hadc) { ADC_Finished = 1; }
+void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef* hadc) { sun_ready = 1; }
 
 // initiate variables for sun sensors
 int maxIntensity[6];  // Maximum sensor values
@@ -272,11 +272,13 @@ int main(void) {
   sprintf(id_msg, "IIS2MDC ID: expected %d, read %d\n", IIS2MDC_ID, whoAmI);
   HAL_UART_Transmit(&huart1, (uint8_t*)id_msg, strlen(id_msg), 100);
 
-  // Initialising DMA for sun sensor ADC (ADC1)
+  /*
+   * Note that sun[6] = {-Z, +Z, +X, +Y, -X, -Y}
+   */
   uint16_t sun[6];
-  HAL_ADC_Start_DMA(&hadc1, (uint32_t*)sun, 6);
+  HAL_ADC_Start_DMA(&hadc1, (uint32_t*)sun, 6);  // Initialising DMA for ADC1
 
-  // Initialising PWM timers for magnetorquer H-bridges and setting to ~50%
+  // Initialising PWM timers for magnetorquer H-bridges, with duty cycle of ~50%
   HAL_TIM_PWM_Start(&htim2, TIM_CHANNEL_1);
   __HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_1, 128);
   HAL_TIM_PWM_Start(&htim2, TIM_CHANNEL_4);
@@ -290,41 +292,11 @@ int main(void) {
   HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_2);
   __HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_2, 128);
 
-  // gyro bias reduction
-  lsm6dso_angular_rate_raw_get(&IMU_ctx, raw_gyro);
-  //  gyro_intermediate[0] = raw_gyro_to_degreespersecond(raw_gyro[0]);
-  //  gyro_intermediate[1] = -raw_gyro_to_degreespersecond(raw_gyro[1]);
-  //  gyro_intermediate[2] = raw_gyro_to_degreespersecond(raw_gyro[2]);
-  float sumx = 0.0f, sumy = 0.0f, sumz = 0.0f;
-  char waiting[] = "Calibrating offset values";
-  HAL_UART_Transmit(&huart1, (uint8_t*)waiting, strlen(waiting), 100);
-  int n = 1;  // number of calibration trials
-  for (int i = 0; i < n; i++) {
-    sumx += gyro_intermediate[0];
-    sumy += gyro_intermediate[1];
-    sumz += gyro_intermediate[2];
-    HAL_Delay(3);
-  }
-
-  //  float offset_x = sumx/(n-1);
-  //  float offset_y = sumy/(n-1);
-  //  float offset_z = sumz/(n-1);
-  //	sprintf(OFFSET, "OFFSET X=%.5f Y=%.5f Z=%.5f \r\n",offset_x, offset_y,
-  // offset_z); 	HAL_UART_Transmit(&huart1, (uint8_t *)OFFSET,
-  // strlen(OFFSET), HAL_MAX_DELAY); 	HAL_Delay(2000);
-
-  /* USER CODE END 2 */
-  
-  /* Infinite loop */
-  /* USER CODE BEGIN WHILE */
-
   /* Variables */
   int16_t raw_accel[3];
   float accel_mss[3];
   char accel_data[64];
-  int16_t raw_gyro[3];
   volatile char gyro_data[64];
-  float gyro_intermediate[3];
   float G_X_roll = 0.0f;
   float G_Y_pitch = 0.0f;
   float G_Z_yaw = 0.0f;
@@ -333,42 +305,34 @@ int main(void) {
   int16_t raw_mag[3];
   char mag_data[64];
   float dt = 0.0f;
-  int16_t Z_Minus;
-  int16_t Z_Plus;
-  int16_t X_Plus;
-  int16_t Y_Plus;
-  int16_t X_Minus;
-  int16_t Y_Minus;
-  char SUN_DATA[100];
+  char sun_data_str[100];
 
   uint32_t last_tick = HAL_GetTick();
+
+  /* USER CODE END 2 */
+
+  /* Infinite loop */
+  /* USER CODE BEGIN WHILE */
   while (1) {
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
     HAL_Delay(500);
 
-    // code to display raw data from sensors in the form of 2^16- 1
-    //	  if (ADC_Finished == 1){
-    //		  ADC_Finished = 0;
-    //		  for(uint8_t i = 0; i<hadc1.Init.NbrOfConversion; i++){
-    //			  Z_Minus= sun[0];
-    //			  Z_Plus = sun[1];
-    //			  X_Plus = sun[2];
-    //			  Y_Plus = sun[3];
-    //			  X_Minus = sun[4];
-    //			  Y_Minus = sun[5];
-    //		  }
-    //		  sprintf(SUN_DATA, "-Z = %u , +Z = %u, -X = %u, +X = %u, -Y =
-    //%u, +Y = %u \r\n", Z_Minus, Z_Plus, X_Minus, X_Plus, Y_Minus, Y_Plus);
-    //		  HAL_UART_Transmit(&huart1, (uint8_t*)SUN_DATA,
-    // strlen(SUN_DATA), HAL_MAX_DELAY); HAL_ADC_Start_DMA(&hadc1,
-    //(uint32_t*)sun, 6);
-    //	  }
+    // Code to display raw data from sensors in the form of 2^16 - 1
+    if (sun_ready == 1) {
+      sun_ready = 0;
+      sprintf(sun_data_str,
+              "-Z = %u, +Z = %u, -X = %u, +X = %u, -Y = % u, +Y = % u\n",
+              sun[0], sun[1], sun[2], sun[3], sun[4], sun[5]);
+      HAL_UART_Transmit(&huart1, (uint8_t*)sun_data_str, strlen(sun_data_str),
+                        HAL_MAX_DELAY);
+    }
 
     //	  uint16_t SUN_Zp = sun[0]; //this block can be deleted
     //	  uint16_t SUN_Xm = sun[1];
-    //	  sprintf(sun_outputs, "Z Positive: %u, X Negative: %u \r\n ", SUN_Zp,
+    //	  sprintf(sun_outputs, "Z Positive: %u, X Negative: %u \r\n ",
+    // SUN_Zp,
     // SUN_Xm); 	  HAL_UART_Transmit(&huart1,(uint8_t*)sun_outputs,
     // strlen(sun_outputs), HAL_MAX_DELAY); 	  HAL_Delay(500);
 
@@ -376,7 +340,8 @@ int main(void) {
     //	  HAL_ADC_PollForConversion(&hadc1, 100);
     //	  sun_Zp = HAL_ADC_GetValue(&hadc1);
     //	  sprintf(sun_output, "Sun: %u \r\n ", sun_Zp);
-    //	  HAL_UART_Transmit(&huart1, (uint8_t*)sun_output, strlen(sun_output),
+    //	  HAL_UART_Transmit(&huart1, (uint8_t*)sun_output,
+    // strlen(sun_output),
     // HAL_MAX_DELAY); 	  HAL_Delay(500);
 
     //  	//getting dt from integrating gyro
@@ -421,7 +386,8 @@ int main(void) {
     //      iis2mdc_magnetic_raw_get(&iis2mdc_ctx, raw_mag);
     //      sprintf(mag_data, "MAG DATA  X: %i Y: %i Z: %i \r\n", raw_mag[0],
     //      raw_mag[1], raw_mag[2]); HAL_UART_Transmit(&huart1,
-    //      (uint8_t*)mag_data, strlen(mag_data), HAL_MAX_DELAY); HAL_Delay(10);
+    //      (uint8_t*)mag_data, strlen(mag_data), HAL_MAX_DELAY);
+    //      HAL_Delay(10);
   }
   /* USER CODE END 3 */
 }
@@ -913,7 +879,8 @@ void MPU_Config(void) {
  */
 void Error_Handler(void) {
   /* USER CODE BEGIN Error_Handler_Debug */
-  /* User can add his own implementation to report the HAL error return state */
+  /* User can add his own implementation to report the HAL error return state
+   */
   __disable_irq();
   while (1) {
   }
@@ -930,8 +897,8 @@ void Error_Handler(void) {
 void assert_failed(uint8_t* file, uint32_t line) {
   /* USER CODE BEGIN 6 */
   /* User can add his own implementation to report the file name and line
-     number, ex: printf("Wrong parameters value: file %s on line %d\r\n", file,
-     line) */
+     number, ex: printf("Wrong parameters value: file %s on line %d\r\n",
+     file, line) */
   /* USER CODE END 6 */
 }
 #endif /* USE_FULL_ASSERT */
