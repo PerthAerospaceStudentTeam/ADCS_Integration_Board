@@ -5,7 +5,7 @@ Utilises the STM32H7A3RGT6 as central MCU to retrieve data, used to control outp
 - IIS2MDCTR, Magnetometer 
 - Sun Sensors  
 
-Codebase also intends to handle filtering of immediate data recieved from such sensors as well as performing sensor fusion to produce meaningful results from Integration Board sensors.
+Codebase also intends to handle filtering of immediate data recieved from such sensors as well as performing sensor fusion to produce meaningful results from Integration Board sensors; such filtering is intended to be completely optional, thus ADCS algorithms may be easily tested on raw sensor data by simply removing calls to sensor filtering functions.
 
 ## Installation Instructions
 ### STM32CubeIDE Github Setup 
@@ -13,7 +13,6 @@ Codebase also intends to handle filtering of immediate data recieved from such s
 - Complete step 5 and onward
 
 ## Configuration
-(May be updated during integration of the sensor filtering algorithms.)
 
 ### Integration_Board_Project Compiledb Build Configuration
 > **Note**: This build configuration is only required if you plan to write code in another IDE using `clangd` instead of the STM32CubeIDE. You can format files using the included `.clang-format` without having to use this Compiledb build configuration.
@@ -36,7 +35,7 @@ Codebase is to be stored and ran on the STM32H7A3RGT6 MCU attached to the ADCS I
 ## Project Structure
 Sun_Sensor_algo directory is used for creation and testing of algorithms related to converting received data from the sun sensors into usable data.  
 
-Integration_Board_Project directory acts as the primary codebase of the repository and represents the actual development within the ADCS_Integration_Board Project. This directory is used to store code for pulling data from all sensors attached to the ADCS_Integration_Board for use in ADCS algorithms.  
+Integration_Board_Project directory acts as the primary codebase of the repository and represents the actual development within the ADCS_Integration_Board Project. This directory is used to store code/stm32cubeide project for pulling data from all sensors attached to the ADCS_Integration_Board for use in ADCS algorithms, primarily for testing purposes.  
 - Integration_Board_Project/Core/Src/main.c contains the main codebase used for project
 
 ## Contributing
@@ -45,9 +44,6 @@ Integration_Board_Project directory acts as the primary codebase of the reposito
 - Michael W
 - Bodhi B
 - Luke L
-
-## Contact
-
 
 ## License
 - Project's usage of STM32CubeIDE is licensed under: [license](https://www.st.com/sla0048)
