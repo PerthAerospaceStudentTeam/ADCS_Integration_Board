@@ -295,9 +295,9 @@ int main(void) {
   __HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_2, 128);
 
   /* Variables */
-  int32_t raw_accel[3];
-  int32_t raw_gyro[3];
-  int32_t raw_mag[3];
+  int16_t raw_accel[3];
+  int16_t raw_gyro[3];
+  int16_t raw_mag[3];
 
   float_t accel_mss[3];
   float_t gyro_mdps[3];
