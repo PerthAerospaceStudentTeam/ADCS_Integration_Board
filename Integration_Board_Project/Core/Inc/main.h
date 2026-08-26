@@ -47,6 +47,12 @@ extern "C" {
 /* Exported macro ------------------------------------------------------------*/
 /* USER CODE BEGIN EM */
 
+/* Macros used for communication return statuses */
+#define COMMUNICATION_SUCCESS 0x00U
+#define COMMUNICATION_ERROR 0x01U
+#define COMMUNICATION_BUSY 0x02U
+#define COMMUNICATION_TIMEOUT 0x03U
+
 /* USER CODE END EM */
 
 void HAL_TIM_MspPostInit(TIM_HandleTypeDef *htim);
