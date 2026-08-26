@@ -304,7 +304,7 @@ int main(void) {
   char gyro_data_str[64];
   char accel_data_str[64];
   char heading_data_str[64];
-  char mag_data[64];
+  char mag_data_str[64];
   char sun_data_str[64];
   char OFFSET[64];
   /* USER CODE END 2 */
@@ -364,12 +364,11 @@ int main(void) {
                       strlen(heading_data_str), HAL_MAX_DELAY);
 
     // Magnetometer data reporting
-    iis2mdc_magnetic_raw_get(&iis2mdc_ctx, raw_mag);
-    sprintf(mag_data, "MAG DATA  X: %i Y: %i Z: %i \r\n", raw_mag[0],
+    iis2mdc_magnetic_raw_get(&MAG_ctx, raw_mag);
+    sprintf(mag_data_str, "MAG DATA  X: %i Y: %i Z: %i \r\n", raw_mag[0],
             raw_mag[1], raw_mag[2]);
-    HAL_UART_Transmit(&huart1, (uint8_t*)mag_data, strlen(mag_data),
+    HAL_UART_Transmit(&huart1, (uint8_t*)mag_data_str, strlen(mag_data_str),
                       HAL_MAX_DELAY);
-    HAL_Delay(10);
   }
   /* USER CODE END 3 */
 }
