@@ -305,14 +305,12 @@ int main(void) {
 
   char gyro_data_str[64];
   char accel_data_str[64];
-  char heading_data_str[64];
   char mag_data_str[64];
   char sun_data_str[64];
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
-  uint32_t prev_tick = HAL_GetTick();
   while (1) {
     /* USER CODE END WHILE */
 
