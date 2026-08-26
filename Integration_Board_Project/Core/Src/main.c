@@ -41,7 +41,12 @@ typedef struct {
   void* interface_h;      // Communication interface handle (SPI_HandleTypeDef)
   GPIO_TypeDef* cs_port;  // Chip select port
   uint16_t cs_pin;        // Chip select pin
-} Sensor_HandleTypeDef;
+} SensorInterface;
+
+typedef enum {
+  kUnavailable = 0,
+  kAvailable = 1,
+} DMA_DataStatus;
 
 /* USER CODE END PTD */
 
@@ -68,7 +73,7 @@ TIM_HandleTypeDef htim3;
 UART_HandleTypeDef huart1;
 
 /* USER CODE BEGIN PV */
-int sun_ready = 0;
+DMA_DataStatus sun_data = kUnavailable;
 
 /* USER CODE END PV */
 
@@ -117,7 +122,7 @@ static void MX_ADC1_Init(void);
  */
 int32_t SensorWrite(void* handle, uint8_t reg, const uint8_t* bufp,
                     uint16_t len) {
-  Sensor_HandleTypeDef* sensor_h = (Sensor_HandleTypeDef*)handle;
+  SensorInterface* sensor_h = (SensorInterface*)handle;
   GPIO_TypeDef* cs_port = sensor_h->cs_port;
   uint16_t cs_pin = sensor_h->cs_pin;
   HAL_GPIO_WritePin(cs_port, cs_pin, GPIO_PIN_RESET);  // Start SPI with CS = 0
@@ -148,7 +153,7 @@ int32_t SensorWrite(void* handle, uint8_t reg, const uint8_t* bufp,
  * Output:      read operation status (0 = success)
  */
 int32_t SensorRead(void* handle, uint8_t reg, uint8_t* bufp, uint16_t len) {
-  Sensor_HandleTypeDef* sensor_h = (Sensor_HandleTypeDef*)handle;
+  SensorInterface* sensor_h = (SensorInterface*)handle;
   GPIO_TypeDef* cs_port = sensor_h->cs_port;
   uint16_t cs_pin = sensor_h->cs_pin;
   HAL_GPIO_WritePin(cs_port, cs_pin, GPIO_PIN_RESET);  // Start SPI with CS = 0
@@ -169,7 +174,7 @@ int32_t SensorRead(void* handle, uint8_t reg, uint8_t* bufp, uint16_t len) {
 /*
  * User defined ADC interrupt handler for callbacks
  */
-void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef* hadc) { sun_ready = 1; }
+void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef* hadc) { sun_data = 1; }
 
 // initiate variables for sun sensors
 int maxIntensity[6];  // Maximum sensor values
@@ -225,7 +230,7 @@ int main(void) {
   /* USER CODE BEGIN 2 */
 
   // Initialise LSM6DSO inertial measurement unit handle
-  Sensor_HandleTypeDef IMU_h;
+  SensorInterface IMU_h;
   IMU_h.interface_h = &hspi1;
   IMU_h.cs_port = IMU_CS_GPIO_Port;
   IMU_h.cs_pin = IMU_CS_Pin;
@@ -236,7 +241,7 @@ int main(void) {
   IMU_ctx.handle = &IMU_h;
 
   // Initialise IIS2MDC magnetometer handle
-  Sensor_HandleTypeDef MAG_h;
+  SensorInterface MAG_h;
   MAG_h.interface_h = &hspi2;
   MAG_h.cs_port = MAG_CS_GPIO_Port;
   MAG_h.cs_pin = MAG_CS_Pin;
@@ -294,19 +299,6 @@ int main(void) {
   __HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_1, 128);
   __HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_2, 128);
 
-  /* Variables */
-  int16_t raw_accel[3];
-  int16_t raw_gyro[3];
-  int16_t raw_mag[3];
-
-  float_t accel_mss[3];
-  float_t gyro_mdps[3];
-  float_t mag_mgauss[3];
-
-  char gyro_data_str[64];
-  char accel_data_str[64];
-  char mag_data_str[64];
-  char sun_data_str[64];
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -316,44 +308,58 @@ int main(void) {
 
     /* USER CODE BEGIN 3 */
 
-    // Sun sensor data reporting
+    // Sun sensor data reporting -----------------------------------------------
     // Note: sun[6] = {-Z, +Z, +X, +Y, -X, -Y} <- NEEDS CHECKING
-    if (sun_ready == 1) {
-      sun_ready = 0;
+    if (sun_data == kAvailable) {
+      sun_data = kUnavailable;
+
+      char sun_data_str[64];
       sprintf(sun_data_str, "SUN,%u,%u,%u,%u,%u,%u\n", sun[0], sun[1], sun[2],
               sun[3], sun[4], sun[5]);
       HAL_UART_Transmit(&huart1, (uint8_t*)sun_data_str, strlen(sun_data_str),
                         HAL_MAX_DELAY);
     }
 
-    // IMU acceleration data reporting
-    lsm6dso_acceleration_raw_get(&IMU_ctx, raw_accel);  // raw_accel = {X, Y, Z}
-    accel_mss[0] = lsm6dso_from_fs2_to_mg(raw_accel[0]);
-    accel_mss[1] = lsm6dso_from_fs2_to_mg(raw_accel[1]);
-    accel_mss[2] = lsm6dso_from_fs2_to_mg(raw_accel[2]);
+    // IMU acceleration data reporting -----------------------------------------
+    int16_t accel_raw[3];
+    lsm6dso_acceleration_raw_get(&IMU_ctx, accel_raw);  // raw_accel = {X, Y, Z}
 
-    sprintf(accel_data_str, "ACC,%.3f,%.3f,%.3f\n", accel_mss[0], accel_mss[1],
-            accel_mss[2]);
+    float_t accel_mg[3];
+    accel_mg[0] = lsm6dso_from_fs2_to_mg(accel_raw[0]);
+    accel_mg[1] = lsm6dso_from_fs2_to_mg(accel_raw[1]);
+    accel_mg[2] = lsm6dso_from_fs2_to_mg(accel_raw[2]);
+
+    char accel_data_str[64];
+    sprintf(accel_data_str, "ACC,%.3f,%.3f,%.3f\n", accel_mg[0], accel_mg[1],
+            accel_mg[2]);
     HAL_UART_Transmit(&huart1, (uint8_t*)accel_data_str, strlen(accel_data_str),
                       HAL_MAX_DELAY);
 
-    // IMU gyroscope data reporting
-    lsm6dso_angular_rate_raw_get(&IMU_ctx, raw_gyro);  // raw_gyro = {X, Y, Z}
-    gyro_mdps[0] = lsm6dso_from_fs250_to_mdps(raw_gyro[0]);
-    gyro_mdps[1] = lsm6dso_from_fs250_to_mdps(raw_gyro[1]);
-    gyro_mdps[2] = lsm6dso_from_fs250_to_mdps(raw_gyro[2]);
+    // IMU gyroscope data reporting --------------------------------------------
+    int16_t gyro_raw[3];
+    lsm6dso_angular_rate_raw_get(&IMU_ctx, gyro_raw);  // raw_gyro = {X, Y, Z}
 
+    float_t gyro_mdps[3];
+    gyro_mdps[0] = lsm6dso_from_fs250_to_mdps(gyro_raw[0]);
+    gyro_mdps[1] = lsm6dso_from_fs250_to_mdps(gyro_raw[1]);
+    gyro_mdps[2] = lsm6dso_from_fs250_to_mdps(gyro_raw[2]);
+
+    char gyro_data_str[64];
     sprintf(gyro_data_str, "GRO,%.3f,%.3f,%.3f\n", gyro_mdps[0], gyro_mdps[1],
             gyro_mdps[2]);
     HAL_UART_Transmit(&huart1, (uint8_t*)gyro_data_str, strlen(gyro_data_str),
                       HAL_MAX_DELAY);
 
-    // Magnetometer data reporting
-    iis2mdc_magnetic_raw_get(&MAG_ctx, raw_mag);  // raw_mag = {X, Y, Z}
-    mag_mgauss[0] = iis2mdc_from_lsb_to_mgauss(raw_mag[0]);
-    mag_mgauss[1] = iis2mdc_from_lsb_to_mgauss(raw_mag[1]);
-    mag_mgauss[2] = iis2mdc_from_lsb_to_mgauss(raw_mag[2]);
+    // Magnetometer data reporting ---------------------------------------------
+    int16_t mag_raw[3];
+    iis2mdc_magnetic_raw_get(&MAG_ctx, mag_raw);  // raw_mag = {X, Y, Z}
 
+    float_t mag_mgauss[3];
+    mag_mgauss[0] = iis2mdc_from_lsb_to_mgauss(mag_raw[0]);
+    mag_mgauss[1] = iis2mdc_from_lsb_to_mgauss(mag_raw[1]);
+    mag_mgauss[2] = iis2mdc_from_lsb_to_mgauss(mag_raw[2]);
+
+    char mag_data_str[64];
     sprintf(mag_data_str, "MAG,%.3f,%.3f,%.3f\n", mag_mgauss[0], mag_mgauss[1],
             mag_mgauss[2]);
     HAL_UART_Transmit(&huart1, (uint8_t*)mag_data_str, strlen(mag_data_str),
