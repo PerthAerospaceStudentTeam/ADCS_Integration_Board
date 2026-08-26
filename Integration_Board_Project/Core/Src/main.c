@@ -34,11 +34,13 @@
 /* Private typedef -----------------------------------------------------------*/
 /* USER CODE BEGIN PTD */
 
-// Handle for organising sensor interface information for read/write operations
+/*
+ * Handle for organising sensor interface information for read/write operations
+ */
 typedef struct {
-  void* interface_h;      // Interface handle e.g. `SPI_HandleTypeDef`
+  void* interface_h;      // Communication interface handle (SPI_HandleTypeDef)
   GPIO_TypeDef* cs_port;  // Chip select port
-  uint16_t cs_pin;        // Chip select pin in `CS_Port`
+  uint16_t cs_pin;        // Chip select pin
 } Sensor_HandleTypeDef;
 
 /* USER CODE END PTD */
@@ -272,108 +274,102 @@ int main(void) {
   sprintf(id_msg, "IIS2MDC ID: expected %d, read %d\n", IIS2MDC_ID, whoAmI);
   HAL_UART_Transmit(&huart1, (uint8_t*)id_msg, strlen(id_msg), 100);
 
-  /*
-   * Note that sun[6] = {-Z, +Z, +X, +Y, -X, -Y}
-   */
-  uint16_t sun[6];
-  HAL_ADC_Start_DMA(&hadc1, (uint32_t*)sun, 6);  // Initialising DMA for ADC1
+  // Enable ADC1 using DMA with interrupts
+  uint16_t sun[6];  // sun[6] = {-Z, +Z, +X, +Y, -X, -Y}
+  HAL_ADC_Start_DMA(&hadc1, (uint32_t*)sun, 6);
 
-  // Initialising PWM timers for magnetorquer H-bridges, with duty cycle of ~50%
+  // Initialising PWM timers for magnetorquer H-bridges
   HAL_TIM_PWM_Start(&htim2, TIM_CHANNEL_1);
-  __HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_1, 128);
-  HAL_TIM_PWM_Start(&htim2, TIM_CHANNEL_4);
-  __HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_4, 128);
   HAL_TIM_PWM_Start(&htim2, TIM_CHANNEL_2);
-  __HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_2, 128);
   HAL_TIM_PWM_Start(&htim2, TIM_CHANNEL_3);
-  __HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_3, 128);
+  HAL_TIM_PWM_Start(&htim2, TIM_CHANNEL_4);
   HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_1);
-  __HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_1, 128);
   HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_2);
+
+  // Setting PWM timers to 50% duty cycle for testing
+  __HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_1, 128);
+  __HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_2, 128);
+  __HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_3, 128);
+  __HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_4, 128);
+  __HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_1, 128);
   __HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_2, 128);
 
   /* Variables */
   int16_t raw_accel[3];
+  int16_t raw_mag[3];
   float accel_mss[3];
-  char accel_data_str[64];
-  volatile char gyro_data[64];
   float G_X_roll = 0.0f;
   float G_Y_pitch = 0.0f;
   float G_Z_yaw = 0.0f;
-  char Gyro_accum[64];
-  char OFFSET[64];
-  int16_t raw_mag[3];
+  char gyro_data_str[64];
+  char accel_data_str[64];
+  char heading_data_str[64];
   char mag_data[64];
-  float dt = 0.0f;
-  char sun_data_str[100];
-
-  uint32_t prev_tick = HAL_GetTick();
-
+  char sun_data_str[64];
+  char OFFSET[64];
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
+  uint32_t prev_tick = HAL_GetTick();
   while (1) {
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-    HAL_Delay(500);
 
     // Sun sensor data reporting
     if (sun_ready == 1) {
       sun_ready = 0;
-      sprintf(
-          sun_data_str,
-          "Sun sensors: -Z = %u, +Z = %u, -X = %u, +X = %u, -Y = %u, +Y = %u\n",
-          sun[0], sun[1], sun[2], sun[3], sun[4], sun[5]);
+      snprintf(sun_data_str, sizeof(sun_data_str), "SUN,%u,%u,%u,%u,%u,%u\n",
+               sun[0], sun[1], sun[2], sun[3], sun[4], sun[5]);
       HAL_UART_Transmit(&huart1, (uint8_t*)sun_data_str, strlen(sun_data_str),
                         HAL_MAX_DELAY);
     }
 
-    
     // IMU acceleration data reporting
     lsm6dso_acceleration_raw_get(&IMU_ctx, raw_accel);
-    
     accel_mss[0] = lsm6dso_from_fs2_to_mg(raw_accel[0]);
     accel_mss[1] = lsm6dso_from_fs2_to_mg(raw_accel[1]);
     accel_mss[2] = lsm6dso_from_fs2_to_mg(raw_accel[2]);
-    
-    sprintf(accel_data_str, "m/s^2: X=%.2f, Y=%.2f, Z=%.2f\n", accel_mss[1],
-      -accel_mss[0], accel_mss[2]);
-      HAL_UART_Transmit(&huart1, (uint8_t*)accel_data_str, strlen(accel_data_str),
-      HAL_MAX_DELAY);
-      
-    // // getting dt from integrating gyro
-    // uint32_t curr_tick = HAL_GetTick();
-    // float dt = (curr_tick - prev_tick) / 1000.0f;
-    // prev_tick = curr_tick;
 
-    // // IMU gyroscope data reporting
-    // lsm6dso_angular_rate_raw_get(&lsm6dso_ctx, raw_gyro);
+    sprintf(accel_data_str, "m/s^2: X = %.2f, Y = %.2f, Z = %.2f\n",
+            accel_mss[1], -accel_mss[0], accel_mss[2]);
+    HAL_UART_Transmit(&huart1, (uint8_t*)accel_data_str, strlen(accel_data_str),
+                      HAL_MAX_DELAY);
 
-    // gyro_intermediate[0] = raw_gyro_to_degreespersecond(raw_gyro[0]) - offset_x;
-    // gyro_intermediate[1] =
-    //     -raw_gyro_to_degreespersecond(raw_gyro[1]) - offset_y;
-    // gyro_intermediate[2] = raw_gyro_to_degreespersecond(raw_gyro[2]) - offset_z;
-    ////        snprintf(gyro_data, sizeof(gyro_data), "GYRO X=%.2f Y=%.2f
-    /// Z=%.2f \r\n", gyro_intermediate[0], gyro_intermediate[1],
-    /// gyro_intermediate[2]); /        HAL_UART_Transmit(&huart1, (uint8_t
-    ///*)gyro_data, strlen(gyro_data), HAL_MAX_DELAY);
-    //      G_X_roll += (gyro_intermediate[0]) * dt;
-    //      G_Y_pitch += (gyro_intermediate[1] )* dt ;
-    //      G_Z_yaw += (gyro_intermediate[2]) * dt ;
-    //
-    //      sprintf(Gyro_accum, "GYRO roll=%.2f pitch=%.2f yaw=%.2f
-    //      \r\n",G_X_roll, G_Y_pitch, G_Z_yaw); HAL_UART_Transmit(&huart1,
-    //      (uint8_t *)Gyro_accum, strlen(Gyro_accum), HAL_MAX_DELAY);
-    //
-    //
-    //     // loop for magnetometer data
-    //      iis2mdc_magnetic_raw_get(&iis2mdc_ctx, raw_mag);
-    //      sprintf(mag_data, "MAG DATA  X: %i Y: %i Z: %i \r\n",
-    //      raw_mag[0], raw_mag[1], raw_mag[2]); HAL_UART_Transmit(&huart1,
-    //      (uint8_t*)mag_data, strlen(mag_data), HAL_MAX_DELAY);
-    //      HAL_Delay(10);
+    // IMU gyroscope data reporting
+    lsm6dso_angular_rate_raw_get(&lsm6dso_ctx, raw_gyro);
+    gyro_intermediate[0] = lsm6dso_from_fs250_to_mdps(raw_gyro[0]);
+    gyro_intermediate[1] = -lsm6dso_from_fs250_to_mdps(raw_gyro[1]);
+    gyro_intermediate[2] = lsm6dso_from_fs250_to_mdps(raw_gyro[2]);
+
+    sprintf(gyro_data_str, "mdps: X = %.2f, Y = %.2f, Z = % .2f\n",
+            gyro_intermediate[0], gyro_intermediate[1], gyro_intermediate[2]);
+    HAL_UART_Transmit(&huart1, (uint8_t*)gyro_data_str, strlen(gyro_data_str),
+                      HAL_MAX_DELAY);
+
+    // Calculating time since last gyroscope read, `dt`
+    uint32_t curr_tick = HAL_GetTick();
+    float dt = (curr_tick - prev_tick) / 1000.0f;
+    prev_tick = curr_tick;
+
+    // Heading data deriving and reporting
+    G_X_roll += gyro_intermediate[0] * dt;
+    G_Y_pitch += gyro_intermediate[1] * dt;
+    G_Z_yaw += gyro_intermediate[2] * dt;
+
+    sprintf(heading_data_str, "roll=%.2f pitch=%.2f yaw=%.2f\n", G_X_roll,
+            G_Y_pitch, G_Z_yaw);
+    HAL_UART_Transmit(&huart1, (uint8_t*)heading_data_str,
+                      strlen(heading_data_str), HAL_MAX_DELAY);
+
+    // Magnetometer data reporting
+    iis2mdc_magnetic_raw_get(&iis2mdc_ctx, raw_mag);
+    sprintf(mag_data, "MAG DATA  X: %i Y: %i Z: %i \r\n", raw_mag[0],
+            raw_mag[1], raw_mag[2]);
+    HAL_UART_Transmit(&huart1, (uint8_t*)mag_data, strlen(mag_data),
+                      HAL_MAX_DELAY);
+    HAL_Delay(10);
   }
   /* USER CODE END 3 */
 }
