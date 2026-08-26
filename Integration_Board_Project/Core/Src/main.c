@@ -119,15 +119,16 @@ static void MX_ADC1_Init(void);
  *
  * Output:      write operation status (0 = success)
  */
-int32_t SensorWrite(void* handle, uint8_t reg, const uint8_t* bufp,
+int32_t SPI_SensorWrite(void* handle, uint8_t reg, const uint8_t* bufp,
                     uint16_t len) {
   SensorInterface* sensor_h = (SensorInterface*)handle;
   GPIO_TypeDef* cs_port = sensor_h->cs_port;
   uint16_t cs_pin = sensor_h->cs_pin;
+  SPI_HandleTypeDef* spi_h = sensor_h->interface_h;
+  HAL_StatusTypeDef status = HAL_ERROR;
+
   HAL_GPIO_WritePin(cs_port, cs_pin, GPIO_PIN_RESET);  // Start SPI with CS = 0
 
-  HAL_StatusTypeDef status = HAL_ERROR;
-  SPI_HandleTypeDef* spi_h = sensor_h->interface_h;
   reg &= 0x7F;  // Bit-mask to set MSB = 0 for write operation
   status = HAL_SPI_Transmit(spi_h, &reg, 1, SPI_TIMEOUT);  // Send write address
 
@@ -151,14 +152,15 @@ int32_t SensorWrite(void* handle, uint8_t reg, const uint8_t* bufp,
  *
  * Output:      read operation status (0 = success)
  */
-int32_t SensorRead(void* handle, uint8_t reg, uint8_t* bufp, uint16_t len) {
+int32_t SPI_SensorRead(void* handle, uint8_t reg, uint8_t* bufp, uint16_t len) {
   SensorInterface* sensor_h = (SensorInterface*)handle;
   GPIO_TypeDef* cs_port = sensor_h->cs_port;
   uint16_t cs_pin = sensor_h->cs_pin;
+  SPI_HandleTypeDef* spi_h = sensor_h->interface_h;
+  HAL_StatusTypeDef status = HAL_ERROR;
+  
   HAL_GPIO_WritePin(cs_port, cs_pin, GPIO_PIN_RESET);  // Start SPI with CS = 0
 
-  HAL_StatusTypeDef status = HAL_ERROR;
-  SPI_HandleTypeDef* spi_h = sensor_h->interface_h;
   reg |= 0x80;  // Bit-mask to set MSB = 1 for read operation
   status = HAL_SPI_Transmit(spi_h, &reg, 1, SPI_TIMEOUT);  // Send read address
 
@@ -234,8 +236,8 @@ int main(void) {
   IMU_h.cs_pin = IMU_CS_Pin;
 
   stmdev_ctx_t IMU_ctx;
-  IMU_ctx.write_reg = SensorWrite;
-  IMU_ctx.read_reg = SensorRead;
+  IMU_ctx.write_reg = SPI_SensorWrite;
+  IMU_ctx.read_reg = SPI_SensorRead;
   IMU_ctx.handle = &IMU_h;
 
   // Initialisation of IIS2MDC magnetometer handle
@@ -245,8 +247,8 @@ int main(void) {
   MAG_h.cs_pin = MAG_CS_Pin;
 
   stmdev_ctx_t MAG_ctx;
-  MAG_ctx.write_reg = SensorWrite;
-  MAG_ctx.read_reg = SensorRead;
+  MAG_ctx.write_reg = SPI_SensorWrite;
+  MAG_ctx.read_reg = SPI_SensorRead;
   MAG_ctx.handle = &MAG_h;
 
   // Configuration of LSM6DSO IMU settings
