@@ -88,7 +88,6 @@ static void MX_SPI2_Init(void);
 static void MX_TIM2_Init(void);
 static void MX_TIM3_Init(void);
 static void MX_ADC1_Init(void);
-
 /* USER CODE BEGIN PFP */
 
 /* USER CODE END PFP */
@@ -226,7 +225,6 @@ int main(void) {
   MX_TIM2_Init();
   MX_TIM3_Init();
   MX_ADC1_Init();
-
   /* USER CODE BEGIN 2 */
 
   // Initialise LSM6DSO inertial measurement unit handle
