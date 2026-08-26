@@ -44,8 +44,8 @@ typedef struct {
 } SensorInterface;
 
 typedef enum {
-  kUnavailable = 0,
-  kAvailable = 1,
+  UNAVAILABLE = 0,
+  AVAILABLE = 1,
 } DMA_DataStatus;
 
 /* USER CODE END PTD */
@@ -73,7 +73,7 @@ TIM_HandleTypeDef htim3;
 UART_HandleTypeDef huart1;
 
 /* USER CODE BEGIN PV */
-DMA_DataStatus sun_data = kUnavailable;
+DMA_DataStatus sun_data = UNAVAILABLE;
 
 /* USER CODE END PV */
 
@@ -171,7 +171,7 @@ int32_t SensorRead(void* handle, uint8_t reg, uint8_t* bufp, uint16_t len) {
 }
 
 /*
- * User defined ADC interrupt handler for callbacks
+ * User defined ADC interrupt handler
  */
 void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef* hadc) { sun_data = 1; }
 
@@ -227,7 +227,7 @@ int main(void) {
   MX_ADC1_Init();
   /* USER CODE BEGIN 2 */
 
-  // Initialise LSM6DSO inertial measurement unit handle
+  // Initialisation of LSM6DSO inertial measurement unit handle
   SensorInterface IMU_h;
   IMU_h.interface_h = &hspi1;
   IMU_h.cs_port = IMU_CS_GPIO_Port;
@@ -238,7 +238,7 @@ int main(void) {
   IMU_ctx.read_reg = SensorRead;
   IMU_ctx.handle = &IMU_h;
 
-  // Initialise IIS2MDC magnetometer handle
+  // Initialisation of IIS2MDC magnetometer handle
   SensorInterface MAG_h;
   MAG_h.interface_h = &hspi2;
   MAG_h.cs_port = MAG_CS_GPIO_Port;
@@ -281,7 +281,7 @@ int main(void) {
   uint16_t sun[6];
   HAL_ADC_Start_DMA(&hadc1, (uint32_t*)sun, 6);
 
-  // Initialising PWM timers for magnetorquer H-bridges
+  // Initialisation of PWM timers for magnetorquer H-bridges
   HAL_TIM_PWM_Start(&htim2, TIM_CHANNEL_1);
   HAL_TIM_PWM_Start(&htim2, TIM_CHANNEL_2);
   HAL_TIM_PWM_Start(&htim2, TIM_CHANNEL_3);
@@ -308,8 +308,8 @@ int main(void) {
 
     // Sun sensor data reporting -----------------------------------------------
     // Note: sun[6] = {-Z, +Z, +X, +Y, -X, -Y} <- NEEDS CHECKING
-    if (sun_data == kAvailable) {
-      sun_data = kUnavailable;
+    if (sun_data == AVAILABLE) {
+      sun_data = UNAVAILABLE;
 
       char sun_data_str[64];
       sprintf(sun_data_str, "SUN,%u,%u,%u,%u,%u,%u\n", sun[0], sun[1], sun[2],
