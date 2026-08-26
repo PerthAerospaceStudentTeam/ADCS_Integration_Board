@@ -177,16 +177,6 @@ int32_t SPI_SensorRead(void* handle, uint8_t reg, uint8_t* bufp, uint16_t len) {
  */
 void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef* hadc) { sun_data = 1; }
 
-// initiate variables for sun sensors
-int maxIntensity[6];  // Maximum sensor values
-int minIntensity[6];  // Minimum sensor values
-void resetCalibration() {
-  for (int i = 0; i <= 5; i++) {
-    maxIntensity[i] = 0U;
-    minIntensity[i] = 0xFFFFU;  // 16-bit max of ADC range
-  }
-}
-
 /* USER CODE END 0 */
 
 /**
