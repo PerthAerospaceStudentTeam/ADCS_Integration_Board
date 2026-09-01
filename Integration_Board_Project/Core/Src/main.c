@@ -23,6 +23,7 @@
 /* USER CODE BEGIN Includes */
 #include "lsm6dso_reg.h"
 #include "iis2mdc_reg.h"
+#include "sensor_filtering_algs.h" //temporary, just for testing
 #include <stdio.h>
 #include <string.h>
 #include <math.h>
@@ -349,7 +350,8 @@ int main(void)
 //	HAL_Delay(2000);
 
 
-
+  //init sensor filter algs by calculating process noise for each sensor
+  calculate_sensor_process_noise();
 
   uint32_t last_tick = HAL_GetTick();
   /* USER CODE END 2 */
@@ -401,8 +403,15 @@ int main(void)
 //  	float dt = (now - last_tick	) / 1000.0f;
 //  	last_tick = now;
 //
-//  	//accelerometer
-//      lsm6dso_acceleration_raw_get(&lsm6dso_ctx, raw_accel);
+	  	//accelerometer
+	  	lsm6dso_acceleration_raw_get(&lsm6dso_ctx, raw_accel);
+
+	  	//print raw values for accelerometer
+	  	snprintf(accel_data, sizeof(accel_data), "RawAccel: x: %i\ty: %i\tz: %i.", raw_accel[1], raw_accel[0], raw_accel[2]);
+	  	//filter raw data
+	  	filter_sensor_data(raw_accel, ACCELEROMETER);
+	  	//print filtered values for accelerometer
+	  	snprintf(accel_data, sizeof(accel_data), "\tFilteredAccel: x: %i\ty: %i\tz: %i.\r\n", raw_accel[1], raw_accel[0], raw_accel[2]);
 //
 //      accel_mss[0] = raw_accel_to_mss(raw_accel[0]);
 //      accel_mss[1] = raw_accel_to_mss(raw_accel[1]);
@@ -412,7 +421,15 @@ int main(void)
 //      HAL_UART_Transmit(&huart1, (uint8_t *)accel_data, strlen(accel_data), HAL_MAX_DELAY);
 //
 //      //gyro
-//      lsm6dso_angular_rate_raw_get(&lsm6dso_ctx, raw_gyro);
+	  	lsm6dso_angular_rate_raw_get(&lsm6dso_ctx, raw_gyro);
+
+	  	//print raw gyro values
+	  	snprintf(gyro_data, sizeof(gyro_data), "RawGyro: x: %i\ty: %i\tz: %i.", raw_gyro[0], raw_gyro[1], raw_gyro[2]);
+	  	//filter raw gyro data
+	  	filter_sensor_data(raw_gyro, GYROSCOPE);
+	  	//print filtered gyro values
+	  	snprintf(gyro_data, sizeof(gyro_data), "\tFilteredGyro: x: %i\ty: %i\tz: %i.\r\n", raw_gyro[0], raw_gyro[1], raw_gyro[2]);
+
 //
 //      gyro_intermediate[0]= raw_gyro_to_degreespersecond(raw_gyro[0]) -offset_x ;
 //      gyro_intermediate[1]= -raw_gyro_to_degreespersecond(raw_gyro[1]) - offset_y ;
@@ -428,8 +445,10 @@ int main(void)
 //
 //
 //     // loop for magnetometer data
-//      iis2mdc_magnetic_raw_get(&iis2mdc_ctx, raw_mag);
-//      sprintf(mag_data, "MAG DATA  X: %i Y: %i Z: %i \r\n", raw_mag[0], raw_mag[1], raw_mag[2]);
+        iis2mdc_magnetic_raw_get(&iis2mdc_ctx, raw_mag);
+        sprintf(mag_data, "RawMag: x: %i\ty: %i\tz: %i.", raw_mag[0], raw_mag[1], raw_mag[2]);
+        filter_sensor_data(raw_mag, MAGNETOMETER);
+        sprintf(mag_data, "\tFilterMag: x: %i\ty: %i\tz: %i.\r\n", raw_mag[0], raw_mag[1], raw_mag[2]);
 //      HAL_UART_Transmit(&huart1, (uint8_t*)mag_data, strlen(mag_data), HAL_MAX_DELAY);
 //      HAL_Delay(10);
   }
