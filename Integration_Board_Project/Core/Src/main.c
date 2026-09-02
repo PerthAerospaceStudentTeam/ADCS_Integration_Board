@@ -120,7 +120,7 @@ static void MX_ADC1_Init(void);
  * Output:      write operation status (0 = success)
  */
 int32_t SPI_SensorWrite(void* handle, uint8_t reg, const uint8_t* bufp,
-                    uint16_t len) {
+                        uint16_t len) {
   SensorInterface* sensor_h = (SensorInterface*)handle;
   GPIO_TypeDef* cs_port = sensor_h->cs_port;
   uint16_t cs_pin = sensor_h->cs_pin;
@@ -158,7 +158,7 @@ int32_t SPI_SensorRead(void* handle, uint8_t reg, uint8_t* bufp, uint16_t len) {
   uint16_t cs_pin = sensor_h->cs_pin;
   SPI_HandleTypeDef* spi_h = sensor_h->interface_h;
   HAL_StatusTypeDef status = HAL_ERROR;
-  
+
   HAL_GPIO_WritePin(cs_port, cs_pin, GPIO_PIN_RESET);  // Start SPI with CS = 0
 
   reg |= 0x80;  // Bit-mask to set MSB = 1 for read operation
@@ -242,20 +242,34 @@ int main(void) {
   MAG_ctx.handle = &MAG_h;
 
   // Configuration of LSM6DSO IMU settings
-  lsm6dso_i3c_disable_set(&IMU_ctx, LSM6DSO_I3C_DISABLE);
-  lsm6dso_spi_mode_set(&IMU_ctx, LSM6DSO_SPI_3_WIRE);
-  lsm6dso_auto_increment_set(&IMU_ctx, PROPERTY_ENABLE);
-  lsm6dso_block_data_update_set(&IMU_ctx, PROPERTY_ENABLE);
-  lsm6dso_xl_data_rate_set(&IMU_ctx, LSM6DSO_XL_ODR_833Hz);
-  lsm6dso_xl_full_scale_set(&IMU_ctx, LSM6DSO_2g);
-  lsm6dso_gy_data_rate_set(&IMU_ctx, LSM6DSO_GY_ODR_833Hz);
-  lsm6dso_gy_full_scale_set(&IMU_ctx, LSM6DSO_250dps);
+  uint32_t IMU_status = 0;
+
+  IMU_status |= lsm6dso_i3c_disable_set(&IMU_ctx, LSM6DSO_I3C_DISABLE);
+  IMU_status |= lsm6dso_spi_mode_set(&IMU_ctx, LSM6DSO_SPI_3_WIRE);
+  IMU_status |= lsm6dso_auto_increment_set(&IMU_ctx, PROPERTY_ENABLE);
+  IMU_status |= lsm6dso_block_data_update_set(&IMU_ctx, PROPERTY_ENABLE);
+  IMU_status |= lsm6dso_xl_data_rate_set(&IMU_ctx, LSM6DSO_XL_ODR_833Hz);
+  IMU_status |= lsm6dso_xl_full_scale_set(&IMU_ctx, LSM6DSO_2g);
+  IMU_status |= lsm6dso_gy_data_rate_set(&IMU_ctx, LSM6DSO_GY_ODR_833Hz);
+  IMU_status |= lsm6dso_gy_full_scale_set(&IMU_ctx, LSM6DSO_250dps);
+
+  if (IMU_status) {
+    char msg[] = "Error configuring LSM6DSO IMU settings\n";
+    (void)HAL_UART_Transmit(&huart1, (uint8_t*)msg, strlen(msg), 100);
+  }
 
   // Configuration of IIS2MDC MAG settings
-  iis2mdc_block_data_update_set(&MAG_ctx, PROPERTY_ENABLE);
-  iis2mdc_data_rate_set(&MAG_ctx, IIS2MDC_ODR_100Hz);
-  iis2mdc_offset_temp_comp_set(&MAG_ctx, PROPERTY_ENABLE);
-  iis2mdc_operating_mode_set(&MAG_ctx, IIS2MDC_CONTINUOUS_MODE);
+  uint32_t MAG_status = 0;
+
+  MAG_status |= iis2mdc_block_data_update_set(&MAG_ctx, PROPERTY_ENABLE);
+  MAG_status |= iis2mdc_data_rate_set(&MAG_ctx, IIS2MDC_ODR_100Hz);
+  MAG_status |= iis2mdc_offset_temp_comp_set(&MAG_ctx, PROPERTY_ENABLE);
+  MAG_status |= iis2mdc_operating_mode_set(&MAG_ctx, IIS2MDC_CONTINUOUS_MODE);
+
+  if (MAG_status) {
+    char msg[] = "Error configuring IIS2MDC MAG settings\n";
+    (void)HAL_UART_Transmit(&huart1, (uint8_t*)msg, strlen(msg), 100);
+  }
 
   // Basic device ID verification over UART
   uint8_t whoAmI;
