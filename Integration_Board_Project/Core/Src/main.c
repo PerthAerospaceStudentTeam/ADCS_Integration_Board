@@ -318,7 +318,7 @@ int main(void) {
       sun_data = UNAVAILABLE;
 
       char sun_data_str[64];
-      sprintf(sun_data_str, "SUN,%u,%u,%u,%u,%u,%u\n", sun[0], sun[1], sun[2],
+      sprintf(sun_data_str, "%ld,SUN,%u,%u,%u,%u,%u,%u\n", HAL_GetTick(), sun[0], sun[1], sun[2],
               sun[3], sun[4], sun[5]);
       HAL_UART_Transmit(&huart1, (uint8_t*)sun_data_str, strlen(sun_data_str),
                         HAL_MAX_DELAY);
@@ -334,7 +334,7 @@ int main(void) {
     accel_mg[2] = lsm6dso_from_fs2_to_mg(accel_raw[2]);
 
     char accel_data_str[64];
-    sprintf(accel_data_str, "ACC,%.3f,%.3f,%.3f\n", accel_mg[0], accel_mg[1],
+    sprintf(accel_data_str, "%ld,ACC,%.3f,%.3f,%.3f\r\n", HAL_GetTick(), accel_mg[0], accel_mg[1],
             accel_mg[2]);
     HAL_UART_Transmit(&huart1, (uint8_t*)accel_data_str, strlen(accel_data_str),
                       HAL_MAX_DELAY);
@@ -349,7 +349,7 @@ int main(void) {
     gyro_mdps[2] = lsm6dso_from_fs250_to_mdps(gyro_raw[2]);
 
     char gyro_data_str[64];
-    sprintf(gyro_data_str, "GRO,%.3f,%.3f,%.3f\n", gyro_mdps[0], gyro_mdps[1],
+    sprintf(gyro_data_str, "%ld,GRO,%.3f,%.3f,%.3f\r\n", HAL_GetTick(), gyro_mdps[0], gyro_mdps[1],
             gyro_mdps[2]);
     HAL_UART_Transmit(&huart1, (uint8_t*)gyro_data_str, strlen(gyro_data_str),
                       HAL_MAX_DELAY);
@@ -364,10 +364,12 @@ int main(void) {
     mag_mgauss[2] = iis2mdc_from_lsb_to_mgauss(mag_raw[2]);
 
     char mag_data_str[64];
-    sprintf(mag_data_str, "MAG,%.3f,%.3f,%.3f\n", mag_mgauss[0], mag_mgauss[1],
+    sprintf(mag_data_str, "%ld,MAG,%.3f,%.3f,%.3f\r\n", HAL_GetTick(), mag_mgauss[0], mag_mgauss[1],
             mag_mgauss[2]);
     HAL_UART_Transmit(&huart1, (uint8_t*)mag_data_str, strlen(mag_data_str),
                       HAL_MAX_DELAY);
+
+    HAL_Delay(500);
   }
   /* USER CODE END 3 */
 }
