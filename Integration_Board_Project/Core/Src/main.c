@@ -73,7 +73,7 @@ TIM_HandleTypeDef htim3;
 UART_HandleTypeDef huart1;
 
 /* USER CODE BEGIN PV */
-DMA_DataStatus sun_data = UNAVAILABLE;
+volatile DMA_DataStatus sun_data = UNAVAILABLE;
 
 /* USER CODE END PV */
 
