@@ -20,6 +20,7 @@ __pycache__/
 
 # Log Files
 *.log
+*log.csv
 logs/
 
 # Environment Files
