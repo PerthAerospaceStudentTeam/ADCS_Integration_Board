@@ -29,6 +29,7 @@
 #include "iis2mdc_reg.h"
 #include "lsm6dso_reg.h"
 #include "stm32h7xx_hal_def.h"
+#include "stm32h7xx_hal_uart.h"
 
 /* USER CODE END Includes */
 
@@ -253,7 +254,7 @@ int main(void) {
   IMU_status |= lsm6dso_gy_full_scale_set(&IMU_ctx, LSM6DSO_250dps);
 
   if (IMU_status != 0) {
-    char msg[] = "Error configuring LSM6DSO IMU settings\n";
+    char msg[] = "|STARTUP| Error configuring LSM6DSO IMU settings\n";
     (void)HAL_UART_Transmit(&huart1, (uint8_t*)msg, strlen(msg), 100);
   }
 
@@ -266,33 +267,48 @@ int main(void) {
   MAG_status |= iis2mdc_operating_mode_set(&MAG_ctx, IIS2MDC_CONTINUOUS_MODE);
 
   if (MAG_status != 0) {
-    char msg[] = "Error configuring IIS2MDC MAG settings\n";
+    char msg[] = "|STARTUP| Error configuring IIS2MDC MAG settings\n";
     (void)HAL_UART_Transmit(&huart1, (uint8_t*)msg, strlen(msg), 100);
   }
 
   // Basic device ID verification over UART
-  uint8_t whoAmI;
+  uint8_t whoAmI = 0;
   char id_msg[64];
 
-  lsm6dso_device_id_get(&IMU_ctx, &whoAmI);
-  sprintf(id_msg, "LSM6DSO ID: expected %d, read %d\n", LSM6DSO_ID, whoAmI);
-  HAL_UART_Transmit(&huart1, (uint8_t*)id_msg, strlen(id_msg), 100);
+  (void)lsm6dso_device_id_get(&IMU_ctx, &whoAmI);
+  (void)sprintf(id_msg, "|STARTUP| LSM6DSO ID: expected %d, read %d\n",
+                LSM6DSO_ID, whoAmI);
+  (void)HAL_UART_Transmit(&huart1, (uint8_t*)id_msg, strlen(id_msg), 100);
 
-  iis2mdc_device_id_get(&MAG_ctx, &whoAmI);
-  sprintf(id_msg, "IIS2MDC ID: expected %d, read %d\n", IIS2MDC_ID, whoAmI);
-  HAL_UART_Transmit(&huart1, (uint8_t*)id_msg, strlen(id_msg), 100);
+  (void)iis2mdc_device_id_get(&MAG_ctx, &whoAmI);
+  (void)sprintf(id_msg, "|STARTUP| IIS2MDC ID: expected %d, read %d\n",
+                IIS2MDC_ID, whoAmI);
+  (void)HAL_UART_Transmit(&huart1, (uint8_t*)id_msg, strlen(id_msg), 100);
 
   // Enable ADC1 using DMA with interrupts
+  uint8_t ADC_status = 0;
+
   uint16_t sun[6];
-  HAL_ADC_Start_DMA(&hadc1, (uint32_t*)sun, 6);
+  ADC_status = HAL_ADC_Start_DMA(&hadc1, (uint32_t*)sun, 6);
+
+  if (ADC_status != 0) {
+    char msg[] = "|STARTUP| Error starting ADC1 with DMA interrupts\n";
+    HAL_UART_Transmit(&huart1, (uint8_t*)msg, strlen(msg), 100);
+  }
 
   // Initialisation of PWM timers for magnetorquer H-bridges
-  HAL_TIM_PWM_Start(&htim2, TIM_CHANNEL_1);
-  HAL_TIM_PWM_Start(&htim2, TIM_CHANNEL_2);
-  HAL_TIM_PWM_Start(&htim2, TIM_CHANNEL_3);
-  HAL_TIM_PWM_Start(&htim2, TIM_CHANNEL_4);
-  HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_1);
-  HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_2);
+  uint8_t PWM_status = 0;
+  PWM_status |= HAL_TIM_PWM_Start(&htim2, TIM_CHANNEL_1);
+  PWM_status |= HAL_TIM_PWM_Start(&htim2, TIM_CHANNEL_2);
+  PWM_status |= HAL_TIM_PWM_Start(&htim2, TIM_CHANNEL_3);
+  PWM_status |= HAL_TIM_PWM_Start(&htim2, TIM_CHANNEL_4);
+  PWM_status |= HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_1);
+  PWM_status |= HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_2);
+
+  if (PWM_status != 0) {
+    char msg[] = "|STARTUP| Error starting magnetorquer PWM timers\n";
+    HAL_UART_Transmit(&huart1, (uint8_t*)msg, strlen(msg), 100);
+  }
 
   // Setting PWM timers to 50% duty cycle for testing
   __HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_1, 128);
