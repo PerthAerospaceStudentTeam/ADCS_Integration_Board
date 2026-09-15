@@ -364,8 +364,8 @@ int main(void) {
     mag_mgauss[2] = iis2mdc_from_lsb_to_mgauss(mag_raw[2]);
 
     char mag_data_str[64];
-    sprintf(mag_data_str, "%ld,MAG,%.3f,%.3f,%.3f\n", HAL_GetTick(), mag_mgauss[0], mag_mgauss[1],
-            mag_mgauss[2]);
+    sprintf(mag_data_str, "%ld,MAG,%.3f,%.3f,%.3f\n", HAL_GetTick(),
+            mag_mgauss[0], mag_mgauss[1], mag_mgauss[2]);
     HAL_UART_Transmit(&huart1, (uint8_t*)mag_data_str, strlen(mag_data_str),
                       HAL_MAX_DELAY);
 
