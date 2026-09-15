@@ -22,6 +22,7 @@
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include <math.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -240,7 +241,7 @@ int main(void) {
   MAG_ctx.handle = &MAG_h;
 
   // Configuration of LSM6DSO IMU settings
-  uint32_t IMU_status = 0;
+  uint8_t IMU_status = 0;
 
   IMU_status |= lsm6dso_i3c_disable_set(&IMU_ctx, LSM6DSO_I3C_DISABLE);
   IMU_status |= lsm6dso_spi_mode_set(&IMU_ctx, LSM6DSO_SPI_3_WIRE);
@@ -251,20 +252,20 @@ int main(void) {
   IMU_status |= lsm6dso_gy_data_rate_set(&IMU_ctx, LSM6DSO_GY_ODR_833Hz);
   IMU_status |= lsm6dso_gy_full_scale_set(&IMU_ctx, LSM6DSO_250dps);
 
-  if (IMU_status) {
+  if (IMU_status != 0) {
     char msg[] = "Error configuring LSM6DSO IMU settings\n";
     (void)HAL_UART_Transmit(&huart1, (uint8_t*)msg, strlen(msg), 100);
   }
 
   // Configuration of IIS2MDC MAG settings
-  uint32_t MAG_status = 0;
+  uint8_t MAG_status = 0;
 
   MAG_status |= iis2mdc_block_data_update_set(&MAG_ctx, PROPERTY_ENABLE);
   MAG_status |= iis2mdc_data_rate_set(&MAG_ctx, IIS2MDC_ODR_100Hz);
   MAG_status |= iis2mdc_offset_temp_comp_set(&MAG_ctx, PROPERTY_ENABLE);
   MAG_status |= iis2mdc_operating_mode_set(&MAG_ctx, IIS2MDC_CONTINUOUS_MODE);
 
-  if (MAG_status) {
+  if (MAG_status != 0) {
     char msg[] = "Error configuring IIS2MDC MAG settings\n";
     (void)HAL_UART_Transmit(&huart1, (uint8_t*)msg, strlen(msg), 100);
   }
