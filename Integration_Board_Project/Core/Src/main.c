@@ -329,7 +329,7 @@ int main(void) {
     char data_str[64];
 
     // Sun sensor data reporting -----------------------------------------------
-    // Note: sun[6] = {-Z, +Z, +X, +Y, -X, -Y} <- NEEDS CHECKING
+    // Note: sun[6] = {-Z, +Z, +X, +Y, -X, -Y}
     if (sun_data == AVAILABLE) {
       sun_data = UNAVAILABLE;
       (void)HAL_ADC_Stop_DMA(&hadc1);  // Stop DMA while accessing sensor data
