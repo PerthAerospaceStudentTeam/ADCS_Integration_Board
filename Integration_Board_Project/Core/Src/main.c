@@ -219,7 +219,7 @@ int main(void) {
   MX_ADC1_Init();
   /* USER CODE BEGIN 2 */
 
-  // Initialisation of LSM6DSO inertial measurement unit handle
+  // Initialisation of LSM6DSO IMU handle
   SensorInterface IMU_h;
   IMU_h.interface_h = &hspi1;
   IMU_h.cs_port = IMU_CS_GPIO_Port;
@@ -336,7 +336,7 @@ int main(void) {
     accel_mg[2] = lsm6dso_from_fs2_to_mg(accel_raw[2]);
 
     char accel_data_str[64];
-    sprintf(accel_data_str, "%ld,ACC,%.3f,%.3f,%.3f\r\n", HAL_GetTick(), accel_mg[0], accel_mg[1],
+    sprintf(accel_data_str, "%ld,ACC,%.3f,%.3f,%.3f\n", HAL_GetTick(), accel_mg[0], accel_mg[1],
             accel_mg[2]);
     HAL_UART_Transmit(&huart1, (uint8_t*)accel_data_str, strlen(accel_data_str),
                       HAL_MAX_DELAY);
@@ -351,7 +351,7 @@ int main(void) {
     gyro_mdps[2] = lsm6dso_from_fs250_to_mdps(gyro_raw[2]);
 
     char gyro_data_str[64];
-    sprintf(gyro_data_str, "%ld,GRO,%.3f,%.3f,%.3f\r\n", HAL_GetTick(), gyro_mdps[0], gyro_mdps[1],
+    sprintf(gyro_data_str, "%ld,GRO,%.3f,%.3f,%.3f\n", HAL_GetTick(), gyro_mdps[0], gyro_mdps[1],
             gyro_mdps[2]);
     HAL_UART_Transmit(&huart1, (uint8_t*)gyro_data_str, strlen(gyro_data_str),
                       HAL_MAX_DELAY);
@@ -366,12 +366,12 @@ int main(void) {
     mag_mgauss[2] = iis2mdc_from_lsb_to_mgauss(mag_raw[2]);
 
     char mag_data_str[64];
-    sprintf(mag_data_str, "%ld,MAG,%.3f,%.3f,%.3f\r\n", HAL_GetTick(), mag_mgauss[0], mag_mgauss[1],
+    sprintf(mag_data_str, "%ld,MAG,%.3f,%.3f,%.3f\n", HAL_GetTick(), mag_mgauss[0], mag_mgauss[1],
             mag_mgauss[2]);
     HAL_UART_Transmit(&huart1, (uint8_t*)mag_data_str, strlen(mag_data_str),
                       HAL_MAX_DELAY);
 
-    HAL_Delay(500);
+    HAL_Delay(50);
   }
   /* USER CODE END 3 */
 }
