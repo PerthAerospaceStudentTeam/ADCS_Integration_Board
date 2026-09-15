@@ -276,4 +276,5 @@
 			<resource resourceType="PROJECT" workspacePath="/Integration_Board_Project"/>
 		</configuration>
 	</storageModule>
+	<storageModule moduleId="org.eclipse.cdt.internal.ui.text.commentOwnerProjectMappings"/>
 </cproject>
