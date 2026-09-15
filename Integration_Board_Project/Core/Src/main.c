@@ -371,14 +371,14 @@ int main(void) {
       gyro_mdps[1] = lsm6dso_from_fs250_to_mdps(gyro_raw[1]);
       gyro_mdps[2] = lsm6dso_from_fs250_to_mdps(gyro_raw[2]);
 
-      (void)sprintf(data_str, "%ld,GRO,%.3f,%.3f,%.3f\n", HAL_GetTick(), gyro_mdps[0],
-              gyro_mdps[1], gyro_mdps[2]);
+      (void)sprintf(data_str, "%ld,GRO,%.3f,%.3f,%.3f\n", HAL_GetTick(),
+                    gyro_mdps[0], gyro_mdps[1], gyro_mdps[2]);
     } else {
       (void)sprintf(data_str, "|ERROR| Error reading gyroscope data\n");
     }
-    
+
     (void)HAL_UART_Transmit(&huart1, (uint8_t*)data_str, strlen(data_str),
-                      HAL_MAX_DELAY);
+                            HAL_MAX_DELAY);
 
     // Magnetometer data reporting ---------------------------------------------
     int16_t mag_raw[3];
@@ -391,13 +391,13 @@ int main(void) {
       mag_mgauss[2] = iis2mdc_from_lsb_to_mgauss(mag_raw[2]);
 
       (void)sprintf(data_str, "%ld,MAG,%.3f,%.3f,%.3f\n", HAL_GetTick(),
-              mag_mgauss[0], mag_mgauss[1], mag_mgauss[2]);
+                    mag_mgauss[0], mag_mgauss[1], mag_mgauss[2]);
     } else {
       (void)sprintf(data_str, "|ERROR| Error reading gyroscope data\n");
     }
 
     (void)HAL_UART_Transmit(&huart1, (uint8_t*)data_str, strlen(data_str),
-                      HAL_MAX_DELAY);
+                            HAL_MAX_DELAY);
 
     HAL_Delay(50);
   }
