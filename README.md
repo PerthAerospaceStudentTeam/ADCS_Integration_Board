@@ -20,6 +20,7 @@ The Compiledb build configuration uses the `compliedb` tool to generate the `com
 
 - Install `compiledb` from: https://github.com/nickdiego/compiledb
 - Record the path to the directory containing `compiledb.exe`
+    - On Windows 10, for a local Python install the path might look like: `C:\Users\<Name>\AppData\Local\Python\pythoncore-3.14-64\Scripts`
 - Open the **ADCS_Integration_Board** project in the STM32CubeIDE
 - Right-click **Integration_Board_Project** -> **properties** -> **C/C++ Build** -> **Environment**
 - Select the `PATH` variable and click **Edit...**
