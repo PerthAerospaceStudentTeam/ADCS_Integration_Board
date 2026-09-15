@@ -316,12 +316,14 @@ int main(void) {
     // Note: sun[6] = {-Z, +Z, +X, +Y, -X, -Y} <- NEEDS CHECKING
     if (sun_data == AVAILABLE) {
       sun_data = UNAVAILABLE;
+      HAL_ADC_Stop_DMA(&hadc1);
 
       char sun_data_str[64];
       sprintf(sun_data_str, "%ld,SUN,%u,%u,%u,%u,%u,%u\n", HAL_GetTick(), sun[0], sun[1], sun[2],
               sun[3], sun[4], sun[5]);
       HAL_UART_Transmit(&huart1, (uint8_t*)sun_data_str, strlen(sun_data_str),
                         HAL_MAX_DELAY);
+      HAL_ADC_Start_DMA(&hadc1, (uint32_t*)sun, 6);
     }
 
     // IMU acceleration data reporting -----------------------------------------
