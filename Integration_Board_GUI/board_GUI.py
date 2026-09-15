@@ -4,14 +4,6 @@ import numpy as np
 import pyqtgraph as pg
 from pyqtgraph.Qt import QtCore
 
-# Searching through current serial ports for the ADCS Integration Board device
-ports = serial.tools.list_ports.comports()
-board_port = "COM_NONE"
-for p in ports:
-    if "STMicroelectronics STLink Virtual COM Port" in p.description:
-        print(f"Found the device: {p.description}\nUsing the port: {p.device}\n")
-        board_port = p.device
-
 # Creating GUI elements --------------------------------------------------------
 PLOT_VALUES = 100  # Number of values to store and plot
 
@@ -97,12 +89,17 @@ def update():  # Called every time the GUI's QTimer creates a signal
             plot_arr[a].setData(x=data_arr[0], y=data_arr[a + 1])
 
 
-# Start of the GUI update loop
-with open("sensor_log.csv", "w") as log_file:  # Implement adding date/time to log name?
-    with serial.Serial(board_port, 115200, timeout=1) as board_serial:
-        timer = QtCore.QTimer()
-        timer.timeout.connect(update)
-        timer.start(1)  # Update the GUI every second
+# Searching through current serial ports for the ADCS Integration Board device
+ports = serial.tools.list_ports.comports()
+for p in ports:
+    if "STMicroelectronics STLink Virtual COM Port" in p.description:
+        print(f"Found the device: {p.description}\nUsing the port: {p.device}\n")
+        # Start of the GUI update loop
+        with open("sensor_log.csv", "w") as log_file:  # Implement adding date/time to log name?
+            with serial.Serial(p.device, 115200, timeout=1) as board_serial:
+                timer = QtCore.QTimer()
+                timer.timeout.connect(update)
+                timer.start(1)  # Update the GUI every second
 
-        if __name__ == "__main__":
-            pg.exec()
+                if __name__ == "__main__":
+                    pg.exec()
