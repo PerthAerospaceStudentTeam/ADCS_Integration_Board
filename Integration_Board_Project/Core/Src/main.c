@@ -344,18 +344,23 @@ int main(void) {
 
     // IMU acceleration data reporting -----------------------------------------
     int16_t accel_raw[3];
-    lsm6dso_acceleration_raw_get(&IMU_ctx, accel_raw);  // raw_accel = {X, Y, Z}
+    uint8_t acc_status = lsm6dso_acceleration_raw_get(&IMU_ctx, accel_raw);
 
-    float_t accel_mg[3];
-    accel_mg[0] = lsm6dso_from_fs2_to_mg(accel_raw[0]);
-    accel_mg[1] = lsm6dso_from_fs2_to_mg(accel_raw[1]);
-    accel_mg[2] = lsm6dso_from_fs2_to_mg(accel_raw[2]);
+    char acc_data_str[64];
+    if (acc_status != 0) {
+      (void)sprintf(acc_data_str, "|ERROR| Error reading acceleration data\n");
+    } else {
+      float_t accel_mg[3];  // raw_accel = {X, Y, Z}
+      accel_mg[0] = lsm6dso_from_fs2_to_mg(accel_raw[0]);
+      accel_mg[1] = lsm6dso_from_fs2_to_mg(accel_raw[1]);
+      accel_mg[2] = lsm6dso_from_fs2_to_mg(accel_raw[2]);
 
-    char accel_data_str[64];
-    sprintf(accel_data_str, "%ld,ACC,%.3f,%.3f,%.3f\n", HAL_GetTick(),
-            accel_mg[0], accel_mg[1], accel_mg[2]);
-    HAL_UART_Transmit(&huart1, (uint8_t*)accel_data_str, strlen(accel_data_str),
-                      HAL_MAX_DELAY);
+      (void)sprintf(acc_data_str, "%ld,ACC,%.3f,%.3f,%.3f\n", HAL_GetTick(),
+                    accel_mg[0], accel_mg[1], accel_mg[2]);
+    }
+
+    (void)HAL_UART_Transmit(&huart1, (uint8_t*)acc_data_str,
+                            strlen(acc_data_str), HAL_MAX_DELAY);
 
     // IMU gyroscope data reporting --------------------------------------------
     int16_t gyro_raw[3];
