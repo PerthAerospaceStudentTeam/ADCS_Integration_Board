@@ -326,6 +326,7 @@ int main(void) {
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
+    char data_str[64];
 
     // Sun sensor data reporting -----------------------------------------------
     // Note: sun[6] = {-Z, +Z, +X, +Y, -X, -Y} <- NEEDS CHECKING
@@ -333,63 +334,69 @@ int main(void) {
       sun_data = UNAVAILABLE;
       (void)HAL_ADC_Stop_DMA(&hadc1);  // Stop DMA while accessing sensor data
 
-      char sun_data_str[64];
-      (void)sprintf(sun_data_str, "%ld,SUN,%u,%u,%u,%u,%u,%u\n", HAL_GetTick(),
+      (void)sprintf(data_str, "%ld,SUN,%u,%u,%u,%u,%u,%u\n", HAL_GetTick(),
                     sun[0], sun[1], sun[2], sun[3], sun[4], sun[5]);
-      (void)HAL_UART_Transmit(&huart1, (uint8_t*)sun_data_str,
-                              strlen(sun_data_str), HAL_MAX_DELAY);
+      (void)HAL_UART_Transmit(&huart1, (uint8_t*)data_str, strlen(data_str),
+                              HAL_MAX_DELAY);
 
       (void)HAL_ADC_Start_DMA(&hadc1, (uint32_t*)sun, 6);  // Re-enable DMA
     }
 
     // IMU acceleration data reporting -----------------------------------------
     int16_t accel_raw[3];
-    uint8_t acc_status = lsm6dso_acceleration_raw_get(&IMU_ctx, accel_raw);
+    uint8_t accel_status = lsm6dso_acceleration_raw_get(&IMU_ctx, accel_raw);
 
-    char acc_data_str[64];
-    if (acc_status != 0) {
-      (void)sprintf(acc_data_str, "|ERROR| Error reading acceleration data\n");
-    } else {
-      float_t accel_mg[3];  // raw_accel = {X, Y, Z}
+    if (accel_status == 0) {
+      float_t accel_mg[3];  // accel_mg = {X, Y, Z}
       accel_mg[0] = lsm6dso_from_fs2_to_mg(accel_raw[0]);
       accel_mg[1] = lsm6dso_from_fs2_to_mg(accel_raw[1]);
       accel_mg[2] = lsm6dso_from_fs2_to_mg(accel_raw[2]);
 
-      (void)sprintf(acc_data_str, "%ld,ACC,%.3f,%.3f,%.3f\n", HAL_GetTick(),
+      (void)sprintf(data_str, "%ld,ACC,%.3f,%.3f,%.3f\n", HAL_GetTick(),
                     accel_mg[0], accel_mg[1], accel_mg[2]);
+    } else {
+      (void)sprintf(data_str, "|ERROR| Error reading acceleration data\n");
     }
 
-    (void)HAL_UART_Transmit(&huart1, (uint8_t*)acc_data_str,
-                            strlen(acc_data_str), HAL_MAX_DELAY);
+    (void)HAL_UART_Transmit(&huart1, (uint8_t*)data_str, strlen(data_str),
+                            HAL_MAX_DELAY);
 
     // IMU gyroscope data reporting --------------------------------------------
     int16_t gyro_raw[3];
-    lsm6dso_angular_rate_raw_get(&IMU_ctx, gyro_raw);  // raw_gyro = {X, Y, Z}
+    uint8_t gyro_status = lsm6dso_angular_rate_raw_get(&IMU_ctx, gyro_raw);
 
-    float_t gyro_mdps[3];
-    gyro_mdps[0] = lsm6dso_from_fs250_to_mdps(gyro_raw[0]);
-    gyro_mdps[1] = lsm6dso_from_fs250_to_mdps(gyro_raw[1]);
-    gyro_mdps[2] = lsm6dso_from_fs250_to_mdps(gyro_raw[2]);
+    if (gyro_status == 0) {
+      float_t gyro_mdps[3];  // gyro_mdps = {X, Y, Z}
+      gyro_mdps[0] = lsm6dso_from_fs250_to_mdps(gyro_raw[0]);
+      gyro_mdps[1] = lsm6dso_from_fs250_to_mdps(gyro_raw[1]);
+      gyro_mdps[2] = lsm6dso_from_fs250_to_mdps(gyro_raw[2]);
 
-    char gyro_data_str[64];
-    sprintf(gyro_data_str, "%ld,GRO,%.3f,%.3f,%.3f\n", HAL_GetTick(),
-            gyro_mdps[0], gyro_mdps[1], gyro_mdps[2]);
-    HAL_UART_Transmit(&huart1, (uint8_t*)gyro_data_str, strlen(gyro_data_str),
+      (void)sprintf(data_str, "%ld,GRO,%.3f,%.3f,%.3f\n", HAL_GetTick(), gyro_mdps[0],
+              gyro_mdps[1], gyro_mdps[2]);
+    } else {
+      (void)sprintf(data_str, "|ERROR| Error reading gyroscope data\n");
+    }
+    
+    (void)HAL_UART_Transmit(&huart1, (uint8_t*)data_str, strlen(data_str),
                       HAL_MAX_DELAY);
 
     // Magnetometer data reporting ---------------------------------------------
     int16_t mag_raw[3];
-    iis2mdc_magnetic_raw_get(&MAG_ctx, mag_raw);  // raw_mag = {X, Y, Z}
+    uint8_t mag_status = iis2mdc_magnetic_raw_get(&MAG_ctx, mag_raw);
 
-    float_t mag_mgauss[3];
-    mag_mgauss[0] = iis2mdc_from_lsb_to_mgauss(mag_raw[0]);
-    mag_mgauss[1] = iis2mdc_from_lsb_to_mgauss(mag_raw[1]);
-    mag_mgauss[2] = iis2mdc_from_lsb_to_mgauss(mag_raw[2]);
+    if (mag_status == 0) {
+      float_t mag_mgauss[3];  // mag_mgauss = {X, Y, Z}
+      mag_mgauss[0] = iis2mdc_from_lsb_to_mgauss(mag_raw[0]);
+      mag_mgauss[1] = iis2mdc_from_lsb_to_mgauss(mag_raw[1]);
+      mag_mgauss[2] = iis2mdc_from_lsb_to_mgauss(mag_raw[2]);
 
-    char mag_data_str[64];
-    sprintf(mag_data_str, "%ld,MAG,%.3f,%.3f,%.3f\n", HAL_GetTick(),
-            mag_mgauss[0], mag_mgauss[1], mag_mgauss[2]);
-    HAL_UART_Transmit(&huart1, (uint8_t*)mag_data_str, strlen(mag_data_str),
+      (void)sprintf(data_str, "%ld,MAG,%.3f,%.3f,%.3f\n", HAL_GetTick(),
+              mag_mgauss[0], mag_mgauss[1], mag_mgauss[2]);
+    } else {
+      (void)sprintf(data_str, "|ERROR| Error reading gyroscope data\n");
+    }
+
+    (void)HAL_UART_Transmit(&huart1, (uint8_t*)data_str, strlen(data_str),
                       HAL_MAX_DELAY);
 
     HAL_Delay(50);
