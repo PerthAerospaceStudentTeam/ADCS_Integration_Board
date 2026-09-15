@@ -173,7 +173,7 @@ int32_t SPI_SensorRead(void* handle, uint8_t reg, uint8_t* bufp, uint16_t len) {
 /*
  * User defined ADC interrupt handler
  */
-void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef* hadc) { sun_data = 1; }
+void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef* hadc) { sun_data = AVAILABLE; }
 
 /* USER CODE END 0 */
 
@@ -317,8 +317,8 @@ int main(void) {
       HAL_ADC_Stop_DMA(&hadc1);
 
       char sun_data_str[64];
-      sprintf(sun_data_str, "%ld,SUN,%u,%u,%u,%u,%u,%u\n", HAL_GetTick(), sun[0], sun[1], sun[2],
-              sun[3], sun[4], sun[5]);
+      sprintf(sun_data_str, "%ld,SUN,%u,%u,%u,%u,%u,%u\n", HAL_GetTick(),
+              sun[0], sun[1], sun[2], sun[3], sun[4], sun[5]);
       HAL_UART_Transmit(&huart1, (uint8_t*)sun_data_str, strlen(sun_data_str),
                         HAL_MAX_DELAY);
       HAL_ADC_Start_DMA(&hadc1, (uint32_t*)sun, 6);
@@ -334,8 +334,8 @@ int main(void) {
     accel_mg[2] = lsm6dso_from_fs2_to_mg(accel_raw[2]);
 
     char accel_data_str[64];
-    sprintf(accel_data_str, "%ld,ACC,%.3f,%.3f,%.3f\n", HAL_GetTick(), accel_mg[0], accel_mg[1],
-            accel_mg[2]);
+    sprintf(accel_data_str, "%ld,ACC,%.3f,%.3f,%.3f\n", HAL_GetTick(),
+            accel_mg[0], accel_mg[1], accel_mg[2]);
     HAL_UART_Transmit(&huart1, (uint8_t*)accel_data_str, strlen(accel_data_str),
                       HAL_MAX_DELAY);
 
@@ -349,8 +349,8 @@ int main(void) {
     gyro_mdps[2] = lsm6dso_from_fs250_to_mdps(gyro_raw[2]);
 
     char gyro_data_str[64];
-    sprintf(gyro_data_str, "%ld,GRO,%.3f,%.3f,%.3f\n", HAL_GetTick(), gyro_mdps[0], gyro_mdps[1],
-            gyro_mdps[2]);
+    sprintf(gyro_data_str, "%ld,GRO,%.3f,%.3f,%.3f\n", HAL_GetTick(),
+            gyro_mdps[0], gyro_mdps[1], gyro_mdps[2]);
     HAL_UART_Transmit(&huart1, (uint8_t*)gyro_data_str, strlen(gyro_data_str),
                       HAL_MAX_DELAY);
 
