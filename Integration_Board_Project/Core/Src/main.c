@@ -121,10 +121,9 @@ static void MX_ADC1_Init(void);
  */
 int32_t SPI_SensorWrite(void* handle, uint8_t reg, const uint8_t* bufp,
                         uint16_t len) {
-  SensorInterface* sensor_h = (SensorInterface*)handle;
-  GPIO_TypeDef* cs_port = sensor_h->cs_port;
-  uint16_t cs_pin = sensor_h->cs_pin;
-  SPI_HandleTypeDef* spi_h = sensor_h->interface_h;
+  GPIO_TypeDef* cs_port = ((SensorInterface*)handle)->cs_port;
+  uint16_t cs_pin = ((SensorInterface*)handle)->cs_pin;
+  SPI_HandleTypeDef* spi_h = ((SensorInterface*)handle)->interface_h;
   HAL_StatusTypeDef status = HAL_ERROR;
 
   HAL_GPIO_WritePin(cs_port, cs_pin, GPIO_PIN_RESET);  // Start SPI with CS = 0
@@ -153,10 +152,9 @@ int32_t SPI_SensorWrite(void* handle, uint8_t reg, const uint8_t* bufp,
  * Output:      read operation status (0 = success)
  */
 int32_t SPI_SensorRead(void* handle, uint8_t reg, uint8_t* bufp, uint16_t len) {
-  SensorInterface* sensor_h = (SensorInterface*)handle;
-  GPIO_TypeDef* cs_port = sensor_h->cs_port;
-  uint16_t cs_pin = sensor_h->cs_pin;
-  SPI_HandleTypeDef* spi_h = sensor_h->interface_h;
+  GPIO_TypeDef* cs_port = ((SensorInterface*)handle)->cs_port;
+  uint16_t cs_pin = ((SensorInterface*)handle)->cs_pin;
+  SPI_HandleTypeDef* spi_h = ((SensorInterface*)handle)->interface_h;
   HAL_StatusTypeDef status = HAL_ERROR;
 
   HAL_GPIO_WritePin(cs_port, cs_pin, GPIO_PIN_RESET);  // Start SPI with CS = 0
