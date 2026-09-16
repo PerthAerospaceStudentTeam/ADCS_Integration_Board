@@ -63,30 +63,31 @@ data_dict = {"ACC": acc_arr,
 
 def update():  # Called every time the GUI's QTimer creates a signal
     if board_serial.in_waiting > 0:  # To avoid reading from an empty serial port
-        # Writing serial data to a .csv file
+        # Writing serial data to a log file
         raw_data = board_serial.readline()
         data = raw_data.decode("utf-8")
         log_file.write(data)
 
         # Converting serial data string to the correct data types
-        data = data.strip("\n").split(",")
-        data[0] = int(data[0])
-        for i in range(2, len(data)):
-            data[i] = float(data[i])
+        if "|DATA|" in data:
+            data = data[7::].strip("\n").split(",")
+            data[1] = int(data[1])
+            for i in range(2, len(data)):
+                data[i] = float(data[i])
 
-        # Shuffling down each data array
-        data_arr = data_dict[data[1]]
-        for i in range(PLOT_VALUES - 1):
-            data_arr[0][i] = data_arr[0][i + 1]  # Shuffling down tick data
-            for a in range(1, len(data_arr)):
-                data_arr[a][i] = data_arr[a][i + 1]  # Shuffling down axis data
+            # Shuffling down each data array
+            data_arr = data_dict[data[0]]
+            for i in range(PLOT_VALUES - 1):
+                data_arr[0][i] = data_arr[0][i + 1]  # Shuffling down tick data
+                for a in range(1, len(data_arr)):
+                    data_arr[a][i] = data_arr[a][i + 1]  # Shuffling down axis data
 
-        # Appending new data to each data array
-        plot_arr = plot_dict[data[1]]
-        data_arr[0][PLOT_VALUES - 1] = data[0]  # Appending new tick data
-        for a in range(len(data_arr) - 1):
-            data_arr[a + 1][PLOT_VALUES - 1] = data[a + 2]  # Appending new axis data
-            plot_arr[a].setData(x=data_arr[0], y=data_arr[a + 1])
+            # Appending new data to each data array
+            plot_arr = plot_dict[data[0]]
+            data_arr[0][PLOT_VALUES - 1] = data[1]  # Appending new tick data
+            for a in range(len(data_arr) - 1):
+                data_arr[a + 1][PLOT_VALUES - 1] = data[a + 2]  # Appending new axis data
+                plot_arr[a].setData(x=data_arr[0], y=data_arr[a + 1])
 
 
 # Searching through current serial ports for the ADCS Integration Board device
@@ -95,7 +96,7 @@ for p in ports:
     if "STMicroelectronics STLink Virtual COM Port" in p.description:
         print(f"Found the device: {p.description}\nUsing the port: {p.device}\n")
         # Start of the GUI update loop
-        with open("sensor_log.csv", "w") as log_file:  # Implement adding date/time to log name?
+        with open("sensor_data.log", "w") as log_file:  # Implement adding date/time to log name?
             with serial.Serial(p.device, 115200, timeout=1) as board_serial:
                 timer = QtCore.QTimer()
                 timer.timeout.connect(update)
