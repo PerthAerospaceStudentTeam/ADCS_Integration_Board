@@ -18,17 +18,10 @@
 #define PLACEHOLDER_BIAS 0
 #define PLACEHOLDER_MEASUREMENT_VARIATION 1000
 
-/* VARIABLES FOR PROCESS NOISE CALCULATIONS */
-
-/* variables storing current data measurement rate in Hz for each sensor */
-static int16_t accel_measure_rate = 833;
-static int16_t gyro_measure_rate = 833;
-static int16_t mag_measure_rate = 100;
-
-/* variables storing estimated maximum measurement, currently placeholder, actualvariation will very likely be unique for each sensor */
-static int16_t accel_measure_range = PLACEHOLDER_MEASUREMENT_VARIATION;
-static int16_t gyro_measure_range = PLACEHOLDER_MEASUREMENT_VARIATION;
-static int16_t mag_measure_range = PLACEHOLDER_MEASUREMENT_VARIATION;
+/* Will update each struct instance to contain appropriate value when able */
+const static Fixed_Bias accel_fixed_bias = {PLACEHOLDER_BIAS, PLACEHOLDER_BIAS, PLACEHOLDER_BIAS};
+const static Fixed_Bias gyro_fixed_bias = {PLACEHOLDER_BIAS, PLACEHOLDER_BIAS, PLACEHOLDER_BIAS};
+const static Fixed_Bias mag_fixed_bias = {PLACEHOLDER_BIAS, PLACEHOLDER_BIAS, PLACEHOLDER_BIAS};
 
 /* STRUCTS/VARIABLES FOR FIXED/STATE ESTIMATION FILTERING*/
 typedef struct {
@@ -37,8 +30,78 @@ typedef struct {
 	int16_t z;
 } Fixed_Bias;
 
+#define RAW_MEASUREMENTS_SIZE 10 //define maximum number of raw measurements stored for each axis
+
+/* Struct used to maintain raw measurements + key values for a particular axis */
+typedef struct {
+	int16_t raw_measurements[RAW_MEASUREMENTS_SIZE]; //array of most recent <RAW_MEASUREMENTS_SIZE> raw measurements for axis
+	int16_t index; //stores index to insert next measurement into array
+	int16_t min; //minimum raw measurement within most recent measurements
+	int16_t max; //maximum raw measurement within most recent measurements
+	int16_t avg_difference; //average difference across each measurement in raw_measurements array
+	int16_t avg_measurement; //average of all measurement values within the raw_measurements array
+} Axis_Measurements;
+
+/* various inline functions used to calculate attributes of Axis_Measurements when updating raw_measurements */
+static inline void UPDATE_INDEX(int16_t* index) {
+	*(index)++; 
+	if (*index % RAW_MEASUREMENTS_SIZE == 0) { *(index) = 0; } 
+}
+
+static inline int16_t FIND_MIN(int16_t measurements[]) {
+	uint16_t i; int16_t curr_smallest = (measurements)[0]; 
+	for (i = 1; i < RAW_MEASUREMENTS_SIZE; i++) { 
+		if ((measurements)[i] < curr_smallest) { curr_smallest = (measurements)[i]; } 
+	} 
+	return curr_smallest;
+}
+
+static inline int16_t FIND_MAX(int16_t measurements[]) {
+	uint16_t i; int16_t curr_largest = (measurements)[0]; 
+	for (i = 1; i < RAW_MEASUREMENTS_SIZE; i++) { 
+		if ((measurements)[i] > curr_largest) { curr_largest = (measurements)[i]; } 
+	} 
+	return curr_largest;
+}
+
+static inline int16_t FIND_AVERAGE(int16_t measurements[]) {
+	uint16_t i; int32_t sum_average = 0; //upcast sum of measurements to avoid overflow
+	for (i = 0; i < RAW_MEASUREMENTS_SIZE; i++) { 
+		sum_average += (measurements)[i] ;
+	} 
+	return (int16_t) ( sum_average / RAW_MEASUREMENTS_SIZE );
+}
+
+static inline int16_t FIND_AVERAGE_DIFFERENCE(int16_t measurements[]) {
+	uint16_t i; int32_t sum_differences = 0; //upcast sum of differences to avoid overflow
+	for (i = 0; i < RAW_MEASUREMENTS_SIZE - 1; i++) { 
+		sum_differences += abs((measurements)[i] - (measurements)[i+1]); 
+	} 
+	return (int16_t) ( sum_differences / (RAW_MEASUREMENTS_SIZE - 1));
+}
+
+/* 
+* Function to add new measurement into a Axis_Measurements struct
+* Must recalculate min, max, avg differnce and avg measurement value as well as ensure measurement added to correct index (within raw_measurements array)
+* Imports:
+*	-new_measurement (int16_t): new raw measurement to be stored
+*	-axis_measurements (Axis_Measurements*): pointer to axis_measurements struct to update
+*/
+static void add_new_raw_measurement(int16_t new_measurement, Axis_Measurements* axis_measurements) {
+	/* insert new measurement into array at next index, update index */
+	axis_measurements->raw_measurements[axis_measurements->index] = new_measurement;
+	UPDATE_INDEX(axis_measurements->index);
+
+	/* recalculate other attributes for data */
+	axis_measurements->min = FIND_MIN(axis_measurements->raw_measurements);
+	axis_measurements->max = FIND_MAX(axis_measurements->raw_measurements);
+	axis_measurements->avg_difference = FIND_AVERAGE_DIFFERENCE(axis_measurements->raw_measurements);
+	axis_measurements->avg_measurement = FIND_AVERAGE(axis_measurements->raw_measurements);
+}
+
 /* Struct used to maintain variables required for state prediction algorithm */
 typedef struct {
+	Axis_Measurements raw_measurements;
 	double kalman_gain;
 	int16_t estimation_variation;
 	int16_t state_estimation;
@@ -52,21 +115,27 @@ typedef struct {
 	int16_t sensor_process_noise;
 } Sensor_Reading_Filtering;
 
-/* Will update each struct instance to contain appropriate value when able */
-const static Fixed_Bias accel_fixed_bias = {PLACEHOLDER_BIAS, PLACEHOLDER_BIAS, PLACEHOLDER_BIAS};
-const static Fixed_Bias gyro_fixed_bias = {PLACEHOLDER_BIAS, PLACEHOLDER_BIAS, PLACEHOLDER_BIAS};
-const static Fixed_Bias mag_fixed_bias = {PLACEHOLDER_BIAS, PLACEHOLDER_BIAS, PLACEHOLDER_BIAS};
-
 /* Store variables required to complete state prediction filtering algorithms for each sensor measurement */
-/* '-1' is subsituted for process noise, process noise must be calculated before using these structs via calculate_sensor_process_noise() function */
-static Sensor_Reading_Filtering accel_filtered_state = { {0.0, 0, 0}, {0.0, 0, 0}, {0.0, 0, 0}, -1 };
-static Sensor_Reading_Filtering gyro_filtered_state = { {0.0, 0, 0}, {0.0, 0, 0}, {0.0, 0, 0}, -1 };
-static Sensor_Reading_Filtering mag_filtered_state = { {0.0, 0, 0}, {0.0, 0, 0}, {0.0, 0, 0}, -1 };
+static Sensor_Reading_Filtering accel_filtered_state;
+static Sensor_Reading_Filtering gyro_filtered_state;
+static Sensor_Reading_Filtering mag_filtered_state;
+
+/* VARIABLES FOR PROCESS NOISE CALCULATIONS */
+
+/* variables storing current data measurement rate in Hz for each sensor */
+static int16_t accel_measure_rate = 833;
+static int16_t gyro_measure_rate = 833;
+static int16_t mag_measure_rate = 100;
+
+/* variables storing estimated maximum measurement, currently placeholder, actualvariation will very likely be unique for each sensor */
+static int16_t accel_measure_range = PLACEHOLDER_MEASUREMENT_VARIATION;
+static int16_t gyro_measure_range = PLACEHOLDER_MEASUREMENT_VARIATION;
+static int16_t mag_measure_range = PLACEHOLDER_MEASUREMENT_VARIATION;
 
 /* Simple functions for internal use which simply update internal value for each sensor's process noise*/
-static void update_accel_process_noise() { accel_filtered_state.sensor_process_noise = accel_measure_range / (int16_t)( 1.0 / (double)accel_measure_rate ); }
-static void update_gyro_process_noise() { gyro_filtered_state.sensor_process_noise = gyro_measure_range / (int16_t)( 1.0 / (double)gyro_measure_rate ); }
-static void update_mag_process_noise() { mag_filtered_state.sensor_process_noise = mag_measure_range / (int16_t)( 1.0 / (double)mag_measure_rate ); }
+static inline void update_accel_process_noise() { accel_filtered_state.sensor_process_noise = accel_measure_range / accel_measure_rate; }
+static inline void update_gyro_process_noise() { gyro_filtered_state.sensor_process_noise = gyro_measure_range / gyro_measure_rate; }
+static inline void update_mag_process_noise() { mag_filtered_state.sensor_process_noise = mag_measure_range / mag_measure_rate; }
 
 /*
 * Function to calculate process noise for each sensor (updates sensor_process_noise in required structs)
