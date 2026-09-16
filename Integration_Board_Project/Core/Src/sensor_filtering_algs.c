@@ -48,7 +48,7 @@ static inline void UPDATE_INDEX(int16_t* index) {
 	if (*index % RAW_MEASUREMENTS_SIZE == 0) { *(index) = 0; } 
 }
 
-static inline int16_t FIND_MIN(int16_t measurements[]) {
+static inline int16_t FIND_MIN(int16_t measurements[RAW_MEASUREMENTS_SIZE]) {
 	uint16_t i; int16_t curr_smallest = (measurements)[0]; 
 	for (i = 1; i < RAW_MEASUREMENTS_SIZE; i++) { 
 		if ((measurements)[i] < curr_smallest) { curr_smallest = (measurements)[i]; } 
@@ -56,7 +56,7 @@ static inline int16_t FIND_MIN(int16_t measurements[]) {
 	return curr_smallest;
 }
 
-static inline int16_t FIND_MAX(int16_t measurements[]) {
+static inline int16_t FIND_MAX(int16_t measurements[RAW_MEASUREMENTS_SIZE]) {
 	uint16_t i; int16_t curr_largest = (measurements)[0]; 
 	for (i = 1; i < RAW_MEASUREMENTS_SIZE; i++) { 
 		if ((measurements)[i] > curr_largest) { curr_largest = (measurements)[i]; } 
@@ -64,7 +64,7 @@ static inline int16_t FIND_MAX(int16_t measurements[]) {
 	return curr_largest;
 }
 
-static inline int16_t FIND_AVERAGE(int16_t measurements[]) {
+static inline int16_t FIND_AVERAGE(int16_t measurements[RAW_MEASUREMENTS_SIZE]) {
 	uint16_t i; int32_t sum_average = 0; //upcast sum of measurements to avoid overflow
 	for (i = 0; i < RAW_MEASUREMENTS_SIZE; i++) { 
 		sum_average += (measurements)[i] ;
@@ -72,7 +72,7 @@ static inline int16_t FIND_AVERAGE(int16_t measurements[]) {
 	return (int16_t) ( sum_average / RAW_MEASUREMENTS_SIZE );
 }
 
-static inline int16_t FIND_AVERAGE_DIFFERENCE(int16_t measurements[]) {
+static inline int16_t FIND_AVERAGE_DIFFERENCE(int16_t measurements[RAW_MEASUREMENTS_SIZE]) {
 	uint16_t i; int32_t sum_differences = 0; //upcast sum of differences to avoid overflow
 	for (i = 0; i < RAW_MEASUREMENTS_SIZE - 1; i++) { 
 		sum_differences += abs((measurements)[i] - (measurements)[i+1]); 
@@ -184,7 +184,7 @@ void update_mag_measure_rate(int16_t new_rate_Hz) {
 * 	-data_source (Sensor_Type): enum type indicating which sensor raw data is from
 * Updates imported data to filtered version of data
 */
-void filter_fixed_bias(int16_t data[3], Sensor_Type data_source) {
+static inline void filter_fixed_bias(int16_t data[3], Sensor_Type data_source) {
 
 	// function is only temporarily visible outside of file for testing
 
@@ -220,7 +220,7 @@ void filter_fixed_bias(int16_t data[3], Sensor_Type data_source) {
 * 	-r (int16_t): representing variance in current measurement
 * exports: new value of kalman gain (K), 0.0 <= K <= 1.0
  */
-static double calculate_kalman_gain(int16_t p, int16_t r) {
+static inline double calculate_kalman_gain(int16_t p, int16_t r) {
 	//Kalman-Gain = variance_in_estimation / (variance_in_estimation + variance_in_measurement)
 	return ( (double)p / ( (double)p + (double)r ) );
 }
@@ -233,7 +233,7 @@ static double calculate_kalman_gain(int16_t p, int16_t r) {
 * 	-n (int16_t): process noise
 * exports: new value for variance_in_estimation
 */
-static int16_t calculate_estimate_variation(double k, int16_t p, int16_t n) {
+static inline int16_t calculate_estimate_variation(double k, int16_t p, int16_t n) {
 	return (int16_t)( (1.0 - k) * (double)p ) + n;
 }
 
@@ -245,7 +245,7 @@ static int16_t calculate_estimate_variation(double k, int16_t p, int16_t n) {
 * 	-z (int16_t): measured system state
 * exports: current estimation for state (i.e. filtered measurement for sensor reading)
 */
-static int16_t calculate_state_estimation(int16_t x, double k, int16_t z) {
+static inline int16_t calculate_state_estimation(int16_t x, double k, int16_t z) {
 	return (int16_t)( (double)x + k * (double)(z - x) );
 }
 
@@ -258,7 +258,7 @@ static int16_t calculate_state_estimation(int16_t x, double k, int16_t z) {
 * Updates values stored within state_predict_vars to reflect new state prediction variables (state_predict_vars->state_estimation is filtered data)
 * Exports: value of state_predict_vars->state_estimation after prediction occurs
 */
-int16_t predict_system_state(int16_t data, State_Prediction_Variables* state_predict_vars, int16_t process_noise) {
+static inline int16_t predict_system_state(int16_t data, State_Prediction_Variables* state_predict_vars, int16_t process_noise) {
 	int16_t measurement_variance;
 	
 	// calculate variance in current measurement from estimated state
