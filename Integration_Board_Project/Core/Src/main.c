@@ -334,7 +334,7 @@ int main(void) {
       sun_data = UNAVAILABLE;
       (void)HAL_ADC_Stop_DMA(&hadc1);  // Stop DMA while accessing sensor data
 
-      (void)sprintf(data_str, "%ld,SUN,%u,%u,%u,%u,%u,%u\n", HAL_GetTick(),
+      (void)sprintf(data_str, "|DATA| SUN,%ld,%u,%u,%u,%u,%u,%u\n", HAL_GetTick(),
                     sun[0], sun[1], sun[2], sun[3], sun[4], sun[5]);
       (void)HAL_UART_Transmit(&huart1, (uint8_t*)data_str, strlen(data_str),
                               HAL_MAX_DELAY);
@@ -352,7 +352,7 @@ int main(void) {
       accel_mg[1] = lsm6dso_from_fs2_to_mg(accel_raw[1]);
       accel_mg[2] = lsm6dso_from_fs2_to_mg(accel_raw[2]);
 
-      (void)sprintf(data_str, "%ld,ACC,%.3f,%.3f,%.3f\n", HAL_GetTick(),
+      (void)sprintf(data_str, "|DATA| ACC,%ld,%.3f,%.3f,%.3f\n", HAL_GetTick(),
                     accel_mg[0], accel_mg[1], accel_mg[2]);
     } else {
       (void)sprintf(data_str, "|ERROR| Error reading acceleration data\n");
@@ -371,7 +371,7 @@ int main(void) {
       gyro_mdps[1] = lsm6dso_from_fs250_to_mdps(gyro_raw[1]);
       gyro_mdps[2] = lsm6dso_from_fs250_to_mdps(gyro_raw[2]);
 
-      (void)sprintf(data_str, "%ld,GRO,%.3f,%.3f,%.3f\n", HAL_GetTick(),
+      (void)sprintf(data_str, "|DATA| GRO,%ld,%.3f,%.3f,%.3f\n", HAL_GetTick(),
                     gyro_mdps[0], gyro_mdps[1], gyro_mdps[2]);
     } else {
       (void)sprintf(data_str, "|ERROR| Error reading gyroscope data\n");
@@ -390,7 +390,7 @@ int main(void) {
       mag_mgauss[1] = iis2mdc_from_lsb_to_mgauss(mag_raw[1]);
       mag_mgauss[2] = iis2mdc_from_lsb_to_mgauss(mag_raw[2]);
 
-      (void)sprintf(data_str, "%ld,MAG,%.3f,%.3f,%.3f\n", HAL_GetTick(),
+      (void)sprintf(data_str, "|DATA| MAG,%ld,%.3f,%.3f,%.3f\n", HAL_GetTick(),
                     mag_mgauss[0], mag_mgauss[1], mag_mgauss[2]);
     } else {
       (void)sprintf(data_str, "|ERROR| Error reading gyroscope data\n");
@@ -398,8 +398,6 @@ int main(void) {
 
     (void)HAL_UART_Transmit(&huart1, (uint8_t*)data_str, strlen(data_str),
                             HAL_MAX_DELAY);
-
-    HAL_Delay(50);
   }
   /* USER CODE END 3 */
 }
