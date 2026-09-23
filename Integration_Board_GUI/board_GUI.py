@@ -1,5 +1,6 @@
 import serial.tools.list_ports
 import numpy as np
+import datetime
 
 import pyqtgraph as pg
 from pyqtgraph.Qt import QtCore
@@ -94,9 +95,14 @@ def update():  # Called every time the GUI's QTimer creates a signal
 ports = serial.tools.list_ports.comports()
 for p in ports:
     if "STMicroelectronics STLink Virtual COM Port" in p.description:
-        print(f"Found the device: {p.description}\nUsing the port: {p.device}\n")
+        print(f"Found the device: {p.description}\nUsing the port: {p.device}")
+
+        dt = datetime.datetime.now()
+        log_name = f"{dt.day}-{dt.month}-{dt.year}_{dt.hour}{dt.minute}{dt.second}.log"
+        print(f"Logging to: {log_name}")
+
         # Start of the GUI update loop
-        with open("sensor_data.log", "w") as log_file:  # Implement adding date/time to log name?
+        with open(log_name, "w") as log_file:  # Implement adding date/time to log name?
             with serial.Serial(p.device, 115200, timeout=1) as board_serial:
                 timer = QtCore.QTimer()
                 timer.timeout.connect(update)
