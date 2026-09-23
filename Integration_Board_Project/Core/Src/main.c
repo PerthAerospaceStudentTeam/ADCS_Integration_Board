@@ -334,8 +334,9 @@ int main(void) {
       sun_data = UNAVAILABLE;
       (void)HAL_ADC_Stop_DMA(&hadc1);  // Stop DMA while accessing sensor data
 
-      (void)sprintf(data_str, "|DATA| SUN,%ld,%u,%u,%u,%u,%u,%u\n", HAL_GetTick(),
-                    sun[0], sun[1], sun[2], sun[3], sun[4], sun[5]);
+      (void)sprintf(data_str, "|DATA| SUN,%ld,%u,%u,%u,%u,%u,%u\n",
+                    HAL_GetTick(), sun[0], sun[1], sun[2], sun[3], sun[4],
+                    sun[5]);
       (void)HAL_UART_Transmit(&huart1, (uint8_t*)data_str, strlen(data_str),
                               HAL_MAX_DELAY);
 
@@ -585,7 +586,7 @@ static void MX_SPI1_Init(void) {
   hspi1.Init.CLKPolarity = SPI_POLARITY_LOW;
   hspi1.Init.CLKPhase = SPI_PHASE_1EDGE;
   hspi1.Init.NSS = SPI_NSS_SOFT;
-  hspi1.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_32;
+  hspi1.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_8;
   hspi1.Init.FirstBit = SPI_FIRSTBIT_MSB;
   hspi1.Init.TIMode = SPI_TIMODE_DISABLE;
   hspi1.Init.CRCCalculation = SPI_CRCCALCULATION_DISABLE;
@@ -631,7 +632,7 @@ static void MX_SPI2_Init(void) {
   hspi2.Init.CLKPolarity = SPI_POLARITY_LOW;
   hspi2.Init.CLKPhase = SPI_PHASE_1EDGE;
   hspi2.Init.NSS = SPI_NSS_SOFT;
-  hspi2.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_128;
+  hspi2.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_256;
   hspi2.Init.FirstBit = SPI_FIRSTBIT_MSB;
   hspi2.Init.TIMode = SPI_TIMODE_DISABLE;
   hspi2.Init.CRCCalculation = SPI_CRCCALCULATION_DISABLE;
