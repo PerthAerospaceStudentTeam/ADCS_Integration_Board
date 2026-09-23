@@ -35,52 +35,31 @@ typedef struct {
 /* Struct used to maintain raw measurements + key values for a particular axis */
 typedef struct {
 	int16_t raw_measurements[RAW_MEASUREMENTS_SIZE]; //array of most recent <RAW_MEASUREMENTS_SIZE> raw measurements for axis
-	int16_t index; //stores index to insert next measurement into array
-	int16_t min; //minimum raw measurement within most recent measurements
-	int16_t max; //maximum raw measurement within most recent measurements
-	int16_t avg_difference; //average difference across each measurement in raw_measurements array
-	int16_t avg_measurement; //average of all measurement values within the raw_measurements array
+	int16_t index; //index within raw_measurements new measurement is to be inserted into
+	int16_t raw_variation; //variation between measurements from sensor
+	int16_t mean; //average of all measurement values within the raw_measurements array
 } Axis_Measurements;
 
 /* various inline functions used to calculate attributes of Axis_Measurements when updating raw_measurements */
 static inline void UPDATE_INDEX(int16_t* index) {
-	*(index)++; 
-	if (*index % RAW_MEASUREMENTS_SIZE == 0) { *(index) = 0; } 
+	*(index)++;
+	if (*index % RAW_MEASUREMENTS_SIZE == 0) { *(index) = 0; }
 }
 
-static inline int16_t FIND_MIN(int16_t measurements[RAW_MEASUREMENTS_SIZE]) {
-	uint16_t i; int16_t curr_smallest = (measurements)[0]; 
-	for (i = 1; i < RAW_MEASUREMENTS_SIZE; i++) { 
-		if ((measurements)[i] < curr_smallest) { curr_smallest = (measurements)[i]; } 
-	} 
-	return curr_smallest;
+static inline int16_t CALCULATE_MEAN(Axis_Measurements* axis_measurements) {
+	uint16_t i; int32_t mean = 0; //upcast sum of measurements to avoid overflow
+	for (i = 0; i < RAW_MEASUREMENTS_SIZE; i++) { mean += (axis_measurements->raw_measurements)[i]; }
+	axis_measurements->mean = (int16_t) mean / RAW_MEASUREMENTS_SIZE;
 }
 
-static inline int16_t FIND_MAX(int16_t measurements[RAW_MEASUREMENTS_SIZE]) {
-	uint16_t i; int16_t curr_largest = (measurements)[0]; 
-	for (i = 1; i < RAW_MEASUREMENTS_SIZE; i++) { 
-		if ((measurements)[i] > curr_largest) { curr_largest = (measurements)[i]; } 
-	} 
-	return curr_largest;
+#define SQUARE(x) ((x)*(x))
+static inline CALCULATE_RAW_VARIANCE(Axis_Measurements* axis_measurements) {
+	uint16_t i; int64_t sum_of_squared_differences = 0; //upcast to avoid overflow
+	for (i = 0; i < RAW_MEASUREMENTS_SIZE; i++) { sum_of_squared_differences += SQUARE(axis_measurements->raw_measurements[i] - axis_measurements->mean); }
+	axis_measurements->raw_variation = (int32_t) sum_of_squared_differences / (RAW_MEASUREMENTS_SIZE - 1);
 }
 
-static inline int16_t FIND_AVERAGE(int16_t measurements[RAW_MEASUREMENTS_SIZE]) {
-	uint16_t i; int32_t sum_average = 0; //upcast sum of measurements to avoid overflow
-	for (i = 0; i < RAW_MEASUREMENTS_SIZE; i++) { 
-		sum_average += (measurements)[i] ;
-	} 
-	return (int16_t) ( sum_average / RAW_MEASUREMENTS_SIZE );
-}
-
-static inline int16_t FIND_AVERAGE_DIFFERENCE(int16_t measurements[RAW_MEASUREMENTS_SIZE]) {
-	uint16_t i; int32_t sum_differences = 0; //upcast sum of differences to avoid overflow
-	for (i = 0; i < RAW_MEASUREMENTS_SIZE - 1; i++) { 
-		sum_differences += abs((measurements)[i] - (measurements)[i+1]); 
-	} 
-	return (int16_t) ( sum_differences / (RAW_MEASUREMENTS_SIZE - 1));
-}
-
-/* 
+/*
 * Function to add new measurement into a Axis_Measurements struct
 * Must recalculate min, max, avg differnce and avg measurement value as well as ensure measurement added to correct index (within raw_measurements array)
 * Imports:
@@ -90,13 +69,11 @@ static inline int16_t FIND_AVERAGE_DIFFERENCE(int16_t measurements[RAW_MEASUREME
 static void add_new_raw_measurement(int16_t new_measurement, Axis_Measurements* axis_measurements) {
 	/* insert new measurement into array at next index, update index */
 	axis_measurements->raw_measurements[axis_measurements->index] = new_measurement;
-	UPDATE_INDEX(axis_measurements->index);
+	UPDATE_INDEX(axis_measurements);
 
-	/* recalculate other attributes for data */
-	axis_measurements->min = FIND_MIN(axis_measurements->raw_measurements);
-	axis_measurements->max = FIND_MAX(axis_measurements->raw_measurements);
-	axis_measurements->avg_difference = FIND_AVERAGE_DIFFERENCE(axis_measurements->raw_measurements);
-	axis_measurements->avg_measurement = FIND_AVERAGE(axis_measurements->raw_measurements);
+	/* recalculate mean and variance in most recent <RAW_MEASUREMENT_SIZE> raw measurements */
+	CALCULATE_MEAN(axis_measurements);
+	CALCULATE_RAW_VARIANCE(axis_measurements);
 }
 
 /* Struct used to maintain variables required for state prediction algorithm */
@@ -260,9 +237,11 @@ static inline int16_t calculate_state_estimation(int16_t x, double k, int16_t z)
 */
 static inline int16_t predict_system_state(int16_t data, State_Prediction_Variables* state_predict_vars, int16_t process_noise) {
 	int16_t measurement_variance;
-	
-	// calculate variance in current measurement from estimated state
-	measurement_variance = abs( data - state_predict_vars->state_estimation );
+	//store most recent measurement 
+	add_new_raw_measurement(data, &(state_predict_vars->raw_measurements));
+
+	// retrieve average varaition across all recent raw axis readings
+	measurement_variance = state_predict_vars->raw_measurements.raw_variation;
 
 	//apply state estimation algorithms in order (kalman->estimate_variation->state_estimation)
 	state_predict_vars->kalman_gain = calculate_kalman_gain(state_predict_vars->estimation_variation, measurement_variance);
@@ -270,30 +249,6 @@ static inline int16_t predict_system_state(int16_t data, State_Prediction_Variab
 	state_predict_vars->state_estimation = calculate_state_estimation(state_predict_vars->state_estimation, state_predict_vars->kalman_gain, data);
 
 	return state_predict_vars->state_estimation;
-}
-
-/*
-* Function used to test kalman state estimation filtering algorithm, modified to be used by external files (i.e. does not import struct specific to this file)
-* Imports:
-* 	-data (int16_t): new measurement
-* 	-k (double*): pointer to kalman gain
-* 	-e (int16_t*): pointer to estimation variation
-* 	-s (int16_t*): pointer to state estimation
-* 	-p (int16_t): process noise
-* Exports new data (after filtering applied)
-*/
-int16_t predict_system_state_test(int16_t data, double* k, int16_t* e, int16_t* s, int16_t p) {
-	// This function is only to temporarily exist to allow external files to test exlsuively the kalman filtering function (without fixed bias removal
-	// Function logic mirrors predict_system_state, using imported values as opposed to struct
-	int16_t r = abs(data - *(s));
-
-	*k = calculate_kalman_gain(*e, r);
-	*e = calculate_estimate_variation(*k, *e, p);
-	*s = calculate_state_estimation(*s, *k, data);
-
-	// explicity return filtered value, other values updated via address 
-	return *s;
-
 }
 
 /*
