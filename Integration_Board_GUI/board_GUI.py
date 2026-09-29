@@ -43,12 +43,12 @@ plot_dict = {"ACC": [acc_plt.plot(pen='r', name="X"),
                      mag_plt.plot(pen='g', name="Y"),
                      mag_plt.plot(pen='b', name="Z")],
 
-             "SUN": [sun_plt.plot(pen='r', name="X+"),
-                     sun_plt.plot(pen='m', name="X-"),
-                     sun_plt.plot(pen='g', name="Y+"),
-                     sun_plt.plot(pen='y', name="Y-"),
-                     sun_plt.plot(pen='b', name="Z+"),
-                     sun_plt.plot(pen='c', name="Z-")]}
+             "SUN": [sun_plt.plot(pen='c', name="-Z"),
+                     sun_plt.plot(pen='b', name="+Z"),
+                     sun_plt.plot(pen='r', name="+X"),
+                     sun_plt.plot(pen='g', name="+Y"),
+                     sun_plt.plot(pen='m', name="-X"),
+                     sun_plt.plot(pen='y', name="-Y")]}
 
 # Create data arrays for storing the data for each sensor axis
 # NOTE: arr[0] = a sensor's tick array (x-axis)
