@@ -16,12 +16,6 @@
 /* Define Structs containing fixed bias for x+y+z axis on each sensor */
 /* define placeholder until all bias values can be determined */
 #define PLACEHOLDER_BIAS 0
-#define PLACEHOLDER_MEASUREMENT_VARIATION 1000
-
-/* Will update each struct instance to contain appropriate value when able */
-const static Fixed_Bias accel_fixed_bias = {PLACEHOLDER_BIAS, PLACEHOLDER_BIAS, PLACEHOLDER_BIAS};
-const static Fixed_Bias gyro_fixed_bias = {PLACEHOLDER_BIAS, PLACEHOLDER_BIAS, PLACEHOLDER_BIAS};
-const static Fixed_Bias mag_fixed_bias = {PLACEHOLDER_BIAS, PLACEHOLDER_BIAS, PLACEHOLDER_BIAS};
 
 /* STRUCTS/VARIABLES FOR FIXED/STATE ESTIMATION FILTERING*/
 typedef struct {
@@ -29,6 +23,11 @@ typedef struct {
 	int16_t y;
 	int16_t z;
 } Fixed_Bias;
+
+/* Will update each struct instance to contain appropriate value when able */
+const static Fixed_Bias accel_fixed_bias = {PLACEHOLDER_BIAS, PLACEHOLDER_BIAS, PLACEHOLDER_BIAS};
+const static Fixed_Bias gyro_fixed_bias = {PLACEHOLDER_BIAS, PLACEHOLDER_BIAS, PLACEHOLDER_BIAS};
+const static Fixed_Bias mag_fixed_bias = {PLACEHOLDER_BIAS, PLACEHOLDER_BIAS, PLACEHOLDER_BIAS};
 
 #define RAW_MEASUREMENTS_SIZE 10 //define maximum number of raw measurements stored for each axis
 
@@ -42,18 +41,18 @@ typedef struct {
 
 /* various inline functions used to calculate attributes of Axis_Measurements when updating raw_measurements */
 static inline void UPDATE_INDEX(int16_t* index) {
-	*(index)++;
+	(*index) = (*index) + 1;
 	if (*index % RAW_MEASUREMENTS_SIZE == 0) { *(index) = 0; }
 }
 
-static inline int16_t CALCULATE_MEAN(Axis_Measurements* axis_measurements) {
+static inline void CALCULATE_MEAN(Axis_Measurements* axis_measurements) {
 	uint16_t i; int32_t mean = 0; //upcast sum of measurements to avoid overflow
 	for (i = 0; i < RAW_MEASUREMENTS_SIZE; i++) { mean += (axis_measurements->raw_measurements)[i]; }
 	axis_measurements->mean = (int16_t) mean / RAW_MEASUREMENTS_SIZE;
 }
 
 #define SQUARE(x) ((x)*(x))
-static inline CALCULATE_RAW_VARIANCE(Axis_Measurements* axis_measurements) {
+static inline void CALCULATE_RAW_VARIANCE(Axis_Measurements* axis_measurements) {
 	uint16_t i; int64_t sum_of_squared_differences = 0; //upcast to avoid overflow
 	for (i = 0; i < RAW_MEASUREMENTS_SIZE; i++) { sum_of_squared_differences += SQUARE(axis_measurements->raw_measurements[i] - axis_measurements->mean); }
 	axis_measurements->raw_variation = (int32_t) sum_of_squared_differences / (RAW_MEASUREMENTS_SIZE - 1);
@@ -69,7 +68,7 @@ static inline CALCULATE_RAW_VARIANCE(Axis_Measurements* axis_measurements) {
 static void add_new_raw_measurement(int16_t new_measurement, Axis_Measurements* axis_measurements) {
 	/* insert new measurement into array at next index, update index */
 	axis_measurements->raw_measurements[axis_measurements->index] = new_measurement;
-	UPDATE_INDEX(axis_measurements);
+	UPDATE_INDEX(&(axis_measurements->index));
 
 	/* recalculate mean and variance in most recent <RAW_MEASUREMENT_SIZE> raw measurements */
 	CALCULATE_MEAN(axis_measurements);
@@ -97,22 +96,28 @@ static Sensor_Reading_Filtering accel_filtered_state;
 static Sensor_Reading_Filtering gyro_filtered_state;
 static Sensor_Reading_Filtering mag_filtered_state;
 
+/* set process noise for each sensor */
+#define PROCESS_NOISE 1000
+
 /* VARIABLES FOR PROCESS NOISE CALCULATIONS */
 
-/* variables storing current data measurement rate in Hz for each sensor */
+/* variables storing current data measurement rate in Hz for each sensor
 static int16_t accel_measure_rate = 833;
 static int16_t gyro_measure_rate = 833;
 static int16_t mag_measure_rate = 100;
 
-/* variables storing estimated maximum measurement, currently placeholder, actualvariation will very likely be unique for each sensor */
+/* variables storing estimated maximum measurement, currently placeholder, actualvariation will very likely be unique for each sensor
 static int16_t accel_measure_range = PLACEHOLDER_MEASUREMENT_VARIATION;
 static int16_t gyro_measure_range = PLACEHOLDER_MEASUREMENT_VARIATION;
 static int16_t mag_measure_range = PLACEHOLDER_MEASUREMENT_VARIATION;
+*/
 
 /* Simple functions for internal use which simply update internal value for each sensor's process noise*/
+/*
 static inline void update_accel_process_noise() { accel_filtered_state.sensor_process_noise = accel_measure_range / accel_measure_rate; }
 static inline void update_gyro_process_noise() { gyro_filtered_state.sensor_process_noise = gyro_measure_range / gyro_measure_rate; }
 static inline void update_mag_process_noise() { mag_filtered_state.sensor_process_noise = mag_measure_range / mag_measure_rate; }
+*/
 
 /*
 * Function to calculate process noise for each sensor (updates sensor_process_noise in required structs)
@@ -132,8 +137,8 @@ void calculate_sensor_process_noise() {
 * Imports: new_rate_Hz (new measurement rate of accelerometerin Hz)
 */
 void update_accel_measure_rate(int16_t new_rate_Hz) {
-	accel_measure_rate = new_rate_Hz;
-	update_accel_process_noise();
+	//accel_measure_rate = new_rate_Hz;
+	//update_accel_process_noise();
 }
 
 /*
@@ -141,8 +146,8 @@ void update_accel_measure_rate(int16_t new_rate_Hz) {
 * Imports: new_rate_Hz (new measurement rate of gyroscope in Hz)
 */
 void update_gyro_measure_rate(int16_t new_rate_Hz) {
-	gyro_measure_rate = new_rate_Hz;
-	update_gyro_process_noise();
+	//gyro_measure_rate = new_rate_Hz;
+	//update_gyro_process_noise();
 }
 
 /*
@@ -150,8 +155,8 @@ void update_gyro_measure_rate(int16_t new_rate_Hz) {
 * Imports: new_rate_Hz (new measurement rate of magnetometer in Hz)
 */
 void update_mag_measure_rate(int16_t new_rate_Hz) {
-	mag_measure_rate = new_rate_Hz;
-	update_mag_process_noise();
+	//mag_measure_rate = new_rate_Hz;
+	//update_mag_process_noise();
 }
 
 /*
@@ -162,9 +167,6 @@ void update_mag_measure_rate(int16_t new_rate_Hz) {
 * Updates imported data to filtered version of data
 */
 static inline void filter_fixed_bias(int16_t data[3], Sensor_Type data_source) {
-
-	// function is only temporarily visible outside of file for testing
-
 	/* apply bias removal based on source of raw data */
 	switch(data_source) {
 		case ACCELEROMETER:
@@ -237,7 +239,7 @@ static inline int16_t calculate_state_estimation(int16_t x, double k, int16_t z)
 */
 static inline int16_t predict_system_state(int16_t data, State_Prediction_Variables* state_predict_vars, int16_t process_noise) {
 	int16_t measurement_variance;
-	//store most recent measurement 
+	//store most recent measurement
 	add_new_raw_measurement(data, &(state_predict_vars->raw_measurements));
 
 	// retrieve average varaition across all recent raw axis readings
@@ -263,19 +265,19 @@ void kalman_state_estimation(int16_t data[3], Sensor_Type data_source) {
 	//filter data using appropriate state-estimation variables determined on source of data
 	switch(data_source) {
 		case ACCELEROMETER:
-			data[0] = predict_system_state(data[0], &(accel_filtered_state.x), accel_filtered_state.sensor_process_noise); // x
-			data[1] = predict_system_state(data[1], &(accel_filtered_state.y), accel_filtered_state.sensor_process_noise); // y
-			data[2] = predict_system_state(data[2], &(accel_filtered_state.z), accel_filtered_state.sensor_process_noise); // z
+			data[0] = predict_system_state(data[0], &(accel_filtered_state.x), PROCESS_NOISE); // x
+			data[1] = predict_system_state(data[1], &(accel_filtered_state.y), PROCESS_NOISE); // y
+			data[2] = predict_system_state(data[2], &(accel_filtered_state.z), PROCESS_NOISE); // z
 			break;
 		case GYROSCOPE:
-			data[0] = predict_system_state(data[0], &(gyro_filtered_state.x), gyro_filtered_state.sensor_process_noise); // x
-			data[1] = predict_system_state(data[1], &(gyro_filtered_state.y), gyro_filtered_state.sensor_process_noise); // y
-			data[2] = predict_system_state(data[2], &(gyro_filtered_state.z), gyro_filtered_state.sensor_process_noise); // z
+			data[0] = predict_system_state(data[0], &(gyro_filtered_state.x), PROCESS_NOISE); // x
+			data[1] = predict_system_state(data[1], &(gyro_filtered_state.y), PROCESS_NOISE); // y
+			data[2] = predict_system_state(data[2], &(gyro_filtered_state.z), PROCESS_NOISE); // z
 			break;
 		case MAGNETOMETER:
-			data[0] = predict_system_state(data[0], &(mag_filtered_state.x), mag_filtered_state.sensor_process_noise); // x
-			data[1] = predict_system_state(data[1], &(mag_filtered_state.y), mag_filtered_state.sensor_process_noise); // y
-			data[2] = predict_system_state(data[2], &(mag_filtered_state.z), mag_filtered_state.sensor_process_noise); // z
+			data[0] = predict_system_state(data[0], &(mag_filtered_state.x), PROCESS_NOISE); // x
+			data[1] = predict_system_state(data[1], &(mag_filtered_state.y), PROCESS_NOISE); // y
+			data[2] = predict_system_state(data[2], &(mag_filtered_state.z), PROCESS_NOISE); // z
 			break;
 	}
 }
