@@ -248,9 +248,9 @@ int main(void) {
   IMU_status |= lsm6dso_spi_mode_set(&IMU_ctx, LSM6DSO_SPI_3_WIRE);
   IMU_status |= lsm6dso_auto_increment_set(&IMU_ctx, PROPERTY_ENABLE);
   IMU_status |= lsm6dso_block_data_update_set(&IMU_ctx, PROPERTY_ENABLE);
-  IMU_status |= lsm6dso_xl_data_rate_set(&IMU_ctx, LSM6DSO_XL_ODR_833Hz);
+  IMU_status |= lsm6dso_xl_data_rate_set(&IMU_ctx, LSM6DSO_XL_ODR_6667Hz);
   IMU_status |= lsm6dso_xl_full_scale_set(&IMU_ctx, LSM6DSO_2g);
-  IMU_status |= lsm6dso_gy_data_rate_set(&IMU_ctx, LSM6DSO_GY_ODR_833Hz);
+  IMU_status |= lsm6dso_gy_data_rate_set(&IMU_ctx, LSM6DSO_GY_ODR_6667Hz);
   IMU_status |= lsm6dso_gy_full_scale_set(&IMU_ctx, LSM6DSO_250dps);
 
   if (IMU_status != 0) {
