@@ -29,7 +29,7 @@ const static Fixed_Bias accel_fixed_bias = {PLACEHOLDER_BIAS, PLACEHOLDER_BIAS, 
 const static Fixed_Bias gyro_fixed_bias = {PLACEHOLDER_BIAS, PLACEHOLDER_BIAS, PLACEHOLDER_BIAS};
 const static Fixed_Bias mag_fixed_bias = {PLACEHOLDER_BIAS, PLACEHOLDER_BIAS, PLACEHOLDER_BIAS};
 
-#define RAW_MEASUREMENTS_SIZE 10 //define maximum number of raw measurements stored for each axis
+#define RAW_MEASUREMENTS_SIZE 3 //define maximum number of raw measurements stored for each axis (higher seems unstable)
 
 /* Struct used to maintain raw measurements + key values for a particular axis */
 typedef struct {
@@ -42,11 +42,11 @@ typedef struct {
 /* various inline functions used to calculate attributes of Axis_Measurements when updating raw_measurements */
 static inline void UPDATE_INDEX(int16_t* index) {
 	(*index) = (*index) + 1;
-	if (*index % RAW_MEASUREMENTS_SIZE == 0) { *(index) = 0; }
+	if ((*index) % RAW_MEASUREMENTS_SIZE == 0) { *(index) = 0; }
 }
 
 static inline void CALCULATE_MEAN(Axis_Measurements* axis_measurements) {
-	uint16_t i; int32_t mean = 0; //upcast sum of measurements to avoid overflow
+	uint16_t i; int64_t mean = 0; //upcast sum of measurements to avoid overflow
 	for (i = 0; i < RAW_MEASUREMENTS_SIZE; i++) { mean += (axis_measurements->raw_measurements)[i]; }
 	axis_measurements->mean = (int16_t) mean / RAW_MEASUREMENTS_SIZE;
 }
@@ -54,8 +54,8 @@ static inline void CALCULATE_MEAN(Axis_Measurements* axis_measurements) {
 #define SQUARE(x) ((x)*(x))
 static inline void CALCULATE_RAW_VARIANCE(Axis_Measurements* axis_measurements) {
 	uint16_t i; int64_t sum_of_squared_differences = 0; //upcast to avoid overflow
-	for (i = 0; i < RAW_MEASUREMENTS_SIZE; i++) { sum_of_squared_differences += SQUARE(axis_measurements->raw_measurements[i] - axis_measurements->mean); }
-	axis_measurements->raw_variation = (int32_t) sum_of_squared_differences / (RAW_MEASUREMENTS_SIZE - 1);
+	for (i = 0; i < RAW_MEASUREMENTS_SIZE; i++) { sum_of_squared_differences += (int64_t)SQUARE(axis_measurements->raw_measurements[i] - axis_measurements->mean); }
+	axis_measurements->raw_variation = (int32_t) ( sum_of_squared_differences / (RAW_MEASUREMENTS_SIZE) );
 }
 
 /*
@@ -123,10 +123,12 @@ static inline void update_mag_process_noise() { mag_filtered_state.sensor_proces
 * Function to calculate process noise for each sensor (updates sensor_process_noise in required structs)
 * Must be called at least once before data is to be read from sensors
 */
-void calculate_sensor_process_noise() {	
+void calculate_sensor_process_noise() {
+	/*
 	update_accel_process_noise();
 	update_gyro_process_noise();
 	update_mag_process_noise();
+	*/
 }
 
 /* Functions to update measurement rate for each sensor, used if sensor reading rate is to change */
