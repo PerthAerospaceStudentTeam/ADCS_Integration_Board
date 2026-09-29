@@ -1,21 +1,21 @@
 /* USER CODE BEGIN Header */
 /**
-  ******************************************************************************
-  * @file           : main.h
-  * @brief          : Header for main.c file.
-  *                   This file contains the common defines of the application.
-  ******************************************************************************
-  * @attention
-  *
-  * Copyright (c) 2026 STMicroelectronics.
-  * All rights reserved.
-  *
-  * This software is licensed under terms that can be found in the LICENSE file
-  * in the root directory of this software component.
-  * If no LICENSE file comes with this software, it is provided AS-IS.
-  *
-  ******************************************************************************
-  */
+ ******************************************************************************
+ * @file           : main.h
+ * @brief          : Header for main.c file.
+ *                   This file contains the common defines of the application.
+ ******************************************************************************
+ * @attention
+ *
+ * Copyright (c) 2026 STMicroelectronics.
+ * All rights reserved.
+ *
+ * This software is licensed under terms that can be found in the LICENSE file
+ * in the root directory of this software component.
+ * If no LICENSE file comes with this software, it is provided AS-IS.
+ *
+ ******************************************************************************
+ */
 /* USER CODE END Header */
 
 /* Define to prevent recursive inclusion -------------------------------------*/
@@ -101,14 +101,14 @@ void Error_Handler(void);
 /*
  * Max SPI timeout calculated as max value from all sensors from the below:
  * - max_sensor_time_ms = max_bits_to_read / sensor_spi_baud_rate * 1000
- * 
- * For reading LSM6DSOTR 8-bit registers 0x20 to 0x2D 
+ *
+ * For reading LSM6DSOTR 8-bit registers 0x20 to 0x2D
  * - max_LSM6DSO_time_ms = 14(8) / 2MHz * 1000 = 0.056ms
  *
  * For reading IIS2MDCTR 8-bit registers 0x68 to 0x6F
  * - max_MAG_time_ms =  8(8) / 500KHz * 1000 = 0.128ms
  *
- * Using SPI_TIMEOUT = 5ms to add a buffer to the nominal times above
+ * Using SPI_TIMEOUT = 5ms to add a buffer (5ms seemed better than 1ms)
  */
 #define SPI_TIMEOUT 5
 
