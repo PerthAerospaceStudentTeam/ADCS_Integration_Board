@@ -248,7 +248,7 @@ static inline int16_t predict_system_state(int16_t data, State_Prediction_Variab
 	measurement_variance = state_predict_vars->raw_measurements.raw_variation;
 
 	//apply state estimation algorithms in order (kalman->estimate_variation->state_estimation)
-	state_predict_vars->kalman_gain = calculate_kalman_gain(state_predict_vars->estimation_variation, measurement_variance);
+	state_predict_vars->kalman_gain = calculate_kalman_gain(state_predict_vars->estimation_variation, abs(measurement_variance));
 	state_predict_vars->estimation_variation = calculate_estimate_variation(state_predict_vars->kalman_gain, state_predict_vars->estimation_variation, process_noise);
 	state_predict_vars->state_estimation = calculate_state_estimation(state_predict_vars->state_estimation, state_predict_vars->kalman_gain, data);
 
