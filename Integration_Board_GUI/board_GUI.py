@@ -69,46 +69,48 @@ def update():
     Takes and returns no values.
     """
     global serial_buffer
+    try:
+        # Read all data from the serial port into the serial buffer
+        serial_data = board_serial.read(board_serial.in_waiting)
+        serial_buffer.extend(serial_data)
 
-    # Read all data from the serial port into the serial buffer
-    serial_data = board_serial.read(board_serial.in_waiting)
-    serial_buffer.extend(serial_data)
+        # Only read complete lines (terminating with '\n') from the serial buffer
+        while b'\n' in serial_buffer:
+            update_start = time.perf_counter()
 
-    # Only read complete lines (terminating with '\n') from the serial buffer
-    while b'\n' in serial_buffer:
-        update_start = time.perf_counter()
+            # Extract and decode the first line from the serial buffer
+            serial_line, dl, serial_buffer = serial_buffer.partition(b'\n')
+            decoded_data = serial_line.decode("utf-8")
 
-        # Extract and decode the first line from the serial buffer
-        serial_line, dl, serial_buffer = serial_buffer.partition(b'\n')
-        decoded_data = serial_line.decode("utf-8")
+            log_file.write(decoded_data + '\n')
 
-        log_file.write(decoded_data + '\n')
+            # Process the decoded data and plot the new sensor data (tick + axis)
+            if "|DATA|" in decoded_data:
+                new_data = decoded_data[7:].split(",")  # '|DATA| ' = 7 char, so data is from i = 7 onwards
 
-        # Process the decoded data and plot the new sensor data (tick + axis)
-        if "|DATA|" in decoded_data:
-            new_data = decoded_data[7:].split(",")  # '|DATA| ' = 7 char, so data is from i = 7 onwards
+                if new_data[0] in data_dict:
+                    new_data[1] = int(new_data[1])  # Converts the new data tick
+                    new_data[2:] = [float(d) for d in new_data[2:]]  # Converts the new axis data
 
-            if new_data[0] in data_dict:
-                new_data[1] = int(new_data[1])  # Converts the new data tick
-                new_data[2:] = [float(d) for d in new_data[2:]]  # Converts the new axis data
+                    # Update the sensor's data arrays with the new data
+                    data_arr = data_dict[new_data[0]]
+                    data_arr[:, :-1] = data_arr[:, 1:]  # Shuffles down sensor data arrays by 1 place
+                    data_arr[:, -1] = new_data[1:]  # Adds new sensor data to the end of sensor data arrays
 
-                # Update the sensor's data arrays with the new data
-                data_arr = data_dict[new_data[0]]
-                data_arr[:, :-1] = data_arr[:, 1:]  # Shuffles down sensor data arrays by 1 place
-                data_arr[:, -1] = new_data[1:]  # Adds new sensor data to the end of sensor data arrays
+                    # Update the sensor's data plots with the new data
+                    plot_arr = plot_dict[new_data[0]]
+                    for i in range(len(plot_arr)):
+                        plot_arr[i].setData(x=data_arr[0], y=data_arr[i + 1])  # Plots the new sensor data
 
-                # Update the sensor's data plots with the new data
-                plot_arr = plot_dict[new_data[0]]
-                for i in range(len(plot_arr)):
-                    plot_arr[i].setData(x=data_arr[0], y=data_arr[i + 1])  # Plots the new sensor data
+                    print(f"|DEBUG| bytes waiting: {board_serial.in_waiting}")
+                    print(f"|DEBUG| raw_data: {serial_data}")
+                    print(f"|DEBUG| serial_data: {serial_data}", end="")
+                    print(f"|DEBUG| new_data: {new_data}")
 
-                print(f"|DEBUG| bytes waiting: {board_serial.in_waiting}")
-                print(f"|DEBUG| raw_data: {serial_data}")
-                print(f"|DEBUG| serial_data: {serial_data}", end="")
-                print(f"|DEBUG| new_data: {new_data}")
-
-        update_end = time.perf_counter()
-        print(f"|DEBUG| Update took {(update_end - update_start) * 1000} ms\n")
+            update_end = time.perf_counter()
+            print(f"|DEBUG| Update took {(update_end - update_start) * 1000} ms\n")
+    except Exception as e:
+        print(f"|DEBUG| {e}")
 
 
 # -------------------------------- GUI Program ---------------------------------
