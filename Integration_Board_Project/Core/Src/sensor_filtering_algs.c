@@ -2,10 +2,9 @@
  * This source file contains logic for filtering raw sensor data received from: IIS2MDC Magnetometer AND LSM6DSO Inertial Measurement Unit
  * Such sensor filtering is intended to be completed before sensor fusion, hence filtering is only to handle biases in sensor measurements
  * Approach to sensor filtering:
- * 	->Raw sensor has initIal fixed bias removed, simply: filtered = raw - <calculated/tested fixed bias>
- * 	->Apply Kalman Filtering (or a modified form) to handle instability/stability biases resulting from runtime-based, unpredictable external factors (i.e. Temperature/EMI)
- * 
- * Filtering functions currently return arrays of filtered data, this approach is likely temporary, and is mainly for testing (allows for both the raw and filtered data to be compared)
+ * 	->Apply Kalman state-prediction Filtering to handle unpredictable instability/stability biases.
+ * Current implementation of kalman state filtering utilises a configurable PROCESS_NOISE macro and derives measurement variation from the average variation across defined range of raw measurements from average of all stored raw measurements
+ * Additionally, despite previous plan to use fixed bias to further smooth axis readings, may be more appropriate to implement in sensor fusion, thus fixed bias removal logic is empty for now
 */
 
 /* include header files */
@@ -17,19 +16,33 @@
 /* define placeholder until all bias values can be determined */
 #define PLACEHOLDER_BIAS 0
 
-/* STRUCTS/VARIABLES FOR FIXED/STATE ESTIMATION FILTERING*/
+/* STRUCTS/VARIABLES FOR FIXED FILTERING*/
 typedef struct {
 	int16_t x;
 	int16_t y;
 	int16_t z;
 } Fixed_Bias;
 
-/* Will update each struct instance to contain appropriate value when able */
+/* May either update with actual values if fixed bias determined that should be handled at this point, otherwise will be replaced when implementing sensor fusion */
 const static Fixed_Bias accel_fixed_bias = {PLACEHOLDER_BIAS, PLACEHOLDER_BIAS, PLACEHOLDER_BIAS};
 const static Fixed_Bias gyro_fixed_bias = {PLACEHOLDER_BIAS, PLACEHOLDER_BIAS, PLACEHOLDER_BIAS};
 const static Fixed_Bias mag_fixed_bias = {PLACEHOLDER_BIAS, PLACEHOLDER_BIAS, PLACEHOLDER_BIAS};
 
-#define RAW_MEASUREMENTS_SIZE 3 //define maximum number of raw measurements stored for each axis (higher seems unstable)
+/* Recommended Values for:
+*	-RAW_MEASUREMENTS_SIZE = 7, increase if need more 'accurate' predicted/filtered state at cost of storage
+* 	-PROCESS_NOISE = 1500, increase if desire faster responses to sudden raw measurment readings. Decrease to make filtered state more 'steady'
+*/
+
+/* define maximum number of raw measurements stored for each axis, larger values provide more 'consistent' lag speed (i.e. time taken to readjust to sudden change in average measurements) */
+/* Lower values have caused faster adjustments to increases in axis reading, but slower adjustments to decreases in axis readings */
+/* note: setting value to x requires ((x*16)*3) bits to be stored for each sensor being filtered */
+/* Also: requires x initial measurements until retrieved filtered state can be completely 'trusted' (otherwise, x-num_curr_measurements 0 values are considered in raw measurment average) */
+#define RAW_MEASUREMENTS_SIZE 7
+
+/* set process noise for each sensor, increasing reduces trust in filtered state and increases weight of new incoming measurments on next predicted state */
+/* i.e. increased process noise causes faster responses in predicted state to sudden reading changes, but less 'steady' filtering */
+/* MUST BE > 0, otherwise predicted state will stop updating after time */
+#define PROCESS_NOISE 1500
 
 /* Struct used to maintain raw measurements + key values for a particular axis */
 typedef struct {
@@ -95,71 +108,6 @@ typedef struct {
 static Sensor_Reading_Filtering accel_filtered_state;
 static Sensor_Reading_Filtering gyro_filtered_state;
 static Sensor_Reading_Filtering mag_filtered_state;
-
-/* set process noise for each sensor */
-#define PROCESS_NOISE 1000
-
-/* VARIABLES FOR PROCESS NOISE CALCULATIONS */
-
-/* variables storing current data measurement rate in Hz for each sensor
-static int16_t accel_measure_rate = 833;
-static int16_t gyro_measure_rate = 833;
-static int16_t mag_measure_rate = 100;
-
-/* variables storing estimated maximum measurement, currently placeholder, actualvariation will very likely be unique for each sensor
-static int16_t accel_measure_range = PLACEHOLDER_MEASUREMENT_VARIATION;
-static int16_t gyro_measure_range = PLACEHOLDER_MEASUREMENT_VARIATION;
-static int16_t mag_measure_range = PLACEHOLDER_MEASUREMENT_VARIATION;
-*/
-
-/* Simple functions for internal use which simply update internal value for each sensor's process noise*/
-/*
-static inline void update_accel_process_noise() { accel_filtered_state.sensor_process_noise = accel_measure_range / accel_measure_rate; }
-static inline void update_gyro_process_noise() { gyro_filtered_state.sensor_process_noise = gyro_measure_range / gyro_measure_rate; }
-static inline void update_mag_process_noise() { mag_filtered_state.sensor_process_noise = mag_measure_range / mag_measure_rate; }
-*/
-
-/*
-* Function to calculate process noise for each sensor (updates sensor_process_noise in required structs)
-* Must be called at least once before data is to be read from sensors
-*/
-void calculate_sensor_process_noise() {
-	/*
-	update_accel_process_noise();
-	update_gyro_process_noise();
-	update_mag_process_noise();
-	*/
-}
-
-/* Functions to update measurement rate for each sensor, used if sensor reading rate is to change */
-/* ( associated sensor's process noise is automatically recalculated ) */
-
-/*
-* Function to update measurement rate (in Hz) for accelerometer, auto updates process noise for accelerometer
-* Imports: new_rate_Hz (new measurement rate of accelerometerin Hz)
-*/
-void update_accel_measure_rate(int16_t new_rate_Hz) {
-	//accel_measure_rate = new_rate_Hz;
-	//update_accel_process_noise();
-}
-
-/*
-* Function to update measurement rate (in Hz) for gyroscope, auto updates process noise for gyroscope
-* Imports: new_rate_Hz (new measurement rate of gyroscope in Hz)
-*/
-void update_gyro_measure_rate(int16_t new_rate_Hz) {
-	//gyro_measure_rate = new_rate_Hz;
-	//update_gyro_process_noise();
-}
-
-/*
-* Function to update measurement rate (in Hz) for magnetometer, auto updates process noise for magnetometer
-* Imports: new_rate_Hz (new measurement rate of magnetometer in Hz)
-*/
-void update_mag_measure_rate(int16_t new_rate_Hz) {
-	//mag_measure_rate = new_rate_Hz;
-	//update_mag_process_noise();
-}
 
 /*
 * Function to filter fixed bias from raw sensor readings
