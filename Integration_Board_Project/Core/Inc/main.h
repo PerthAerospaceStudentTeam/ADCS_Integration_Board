@@ -61,6 +61,8 @@ void Error_Handler(void);
 /* Private defines -----------------------------------------------------------*/
 #define MAG_MOSI_Pin GPIO_PIN_3
 #define MAG_MOSI_GPIO_Port GPIOC
+#define LED_Pin GPIO_PIN_0
+#define LED_GPIO_Port GPIOA
 #define MTA_PWM1_Pin GPIO_PIN_1
 #define MTA_PWM1_GPIO_Port GPIOA
 #define MTA_PWM2_Pin GPIO_PIN_2
