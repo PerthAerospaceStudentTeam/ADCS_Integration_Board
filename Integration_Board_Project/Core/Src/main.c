@@ -14,7 +14,23 @@
  * If no LICENSE file comes with this software, it is provided AS-IS.
  *
  ******************************************************************************
+
+ /** Notes ---------------------------------------------------------------------
+ * LSM6DSO IMU
+ * - Uses SPI1
+ * - CS = PB4
+ * - Automatically increments through registers for multiple consecutive
+ *   read/write operations if register CTRL3_C[2] = 1 (set to 1 by default)
+ * - Max read size = 14-bytes (112-bits), registers 0x20:0x2D
+ * - Max required SPI clock = 112 x 6.667kHz = 746.8kHz (~0.75MHz)
+ *
+ * IIS2MDC MAG
+ * - Uses SPI2
+ * - CS = PB2
+ * - Max read size = 8-bytes (64-bits), reading registers 0x68:0x6F
+ * - Max required SPI clock = 64 * 100 = 6.4kHz (9.6kHz for 150Hz 1-shot mode)
  */
+
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
@@ -96,18 +112,6 @@ static void MX_ADC1_Init(void);
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
-
-/** Sensor Notes ---------------------------------------------------------------
- * LSM6DSO IMU
- * - Uses SPI1
- * - CS = PB4
- * - Automatically increments through registers for multiple consecutive
- *   read/write operations if register CTRL3_C[2] = 1 (set to 1 by default)
- *
- * IIS2MDC MAG
- * - Uses SPI2
- * - CS = PB2
- */
 
 /**
  * Uses the SPI interface defined in `sensor_h->handle` to write `len` bytes
