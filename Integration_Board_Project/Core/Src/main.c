@@ -23,6 +23,7 @@
 /* USER CODE BEGIN Includes */
 #include "lsm6dso_reg.h"
 #include "iis2mdc_reg.h"
+#include "sensor_filtering_algs.h" //temporary, just for testing
 #include <stdio.h>
 #include <string.h>
 #include <math.h>
@@ -79,7 +80,7 @@ static void MX_ADC1_Init(void);
 
 stmdev_ctx_t lsm6dso_ctx;
 stmdev_ctx_t iis2mdc_ctx;
- 
+
 /* COMMUNICATION FUNCTIONS */
 /* Functions should not handle failed write operation itself (i.e. loop until success), this should be responsibility of calling function */
 /* All possible return values of functions correspond to COMMUNICATION_... macros defined in main.h */
@@ -87,12 +88,12 @@ stmdev_ctx_t iis2mdc_ctx;
 // LSM6DSO SPI1, CS = PB4
 int32_t lsm6dso_write(void *handle, uint8_t reg,
                       const uint8_t *bufp, uint16_t len)
-{ 
+{
     reg &= 0x7F;
     HAL_GPIO_WritePin(GPIOB, GPIO_PIN_4, GPIO_PIN_RESET); // CS Low
 
     /* write register address to peripheral */
-    int32_t write_status = HAL_SPI_Transmit(&hspi1, &reg, 1, 100)
+    int32_t write_status = HAL_SPI_Transmit(&hspi1, &reg, 1, 100);
 
     /* only attempt to write data to peripheral if register write was successful */
     if (write_status == COMMUNICATION_SUCCESS) {
@@ -117,7 +118,7 @@ int32_t lsm6dso_read(void *handle, uint8_t reg,
     if (comm_status == COMMUNICATION_SUCCESS) {
         comm_status = HAL_SPI_Receive(&hspi1, bufp, len, 1000);
     }
-	  
+
 	  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_4, GPIO_PIN_SET);
     return comm_status;
 }
@@ -128,7 +129,7 @@ int32_t mag_platform_write(void *handle, uint8_t reg,
 {
     reg &= 0x7F;
     HAL_GPIO_WritePin(GPIOB, GPIO_PIN_2, GPIO_PIN_RESET);
-    
+
     /* write the register address to peripheral device */
     int32_t write_status = HAL_SPI_Transmit(&hspi2, &reg, 1, HAL_MAX_DELAY);
 
@@ -146,15 +147,15 @@ int32_t mag_platform_read(void *handle, uint8_t reg,
 {
     reg |= 0x80;
     HAL_GPIO_WritePin(GPIOB, GPIO_PIN_2, GPIO_PIN_RESET);
-    
+
     /* write address of register to peripheral device */
     int32_t comm_status = HAL_SPI_Transmit(&hspi2, &reg, 1, HAL_MAX_DELAY);
-    
+
     /* only attempt to read data from peripheral device if register write to device was successful */
     if (comm_status == COMMUNICATION_SUCCESS) {
         comm_status = HAL_SPI_Receive(&hspi2, bufp, len, HAL_MAX_DELAY);
     }
-    
+
     HAL_GPIO_WritePin(GPIOB, GPIO_PIN_2, GPIO_PIN_SET);
     return comm_status;
 }
@@ -294,8 +295,8 @@ int main(void)
   char mag_data[64];
 
   float dt = 0.0f;
-  
-  /* testing Sun sensors */ 
+
+  /* testing Sun sensors */
 
   HAL_ADC_Start_DMA(&hadc1, (uint32_t*)sun, 6);
   int16_t Z_Minus;
@@ -309,11 +310,11 @@ int main(void)
 
 
 
-  
+
 
 // testing the pwm channels are working for all the magnetometers
 	HAL_TIM_PWM_Start(&htim2, TIM_CHANNEL_1);
-	__HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_1, 123); // ~50% of 255
+	__HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_1, 0); // ~50% of 255
 	HAL_TIM_PWM_Start(&htim2, TIM_CHANNEL_4);
 	__HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_4, 123); // ~50% of 255
 	HAL_TIM_PWM_Start(&htim2, TIM_CHANNEL_2);
@@ -326,6 +327,7 @@ int main(void)
 	__HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_2, 123);
 
   //gyro bias reduction
+	/*
   lsm6dso_angular_rate_raw_get(&lsm6dso_ctx, raw_gyro);
   gyro_intermediate[0]= raw_gyro_to_degreespersecond(raw_gyro[0]);
   gyro_intermediate[1]= -raw_gyro_to_degreespersecond(raw_gyro[1]);
@@ -340,6 +342,7 @@ int main(void)
   	sumz += gyro_intermediate[2];
   	HAL_Delay (3);
   }
+  */
 
 //  float offset_x = sumx/(n-1);
 //  float offset_y = sumy/(n-1);
@@ -349,7 +352,8 @@ int main(void)
 //	HAL_Delay(2000);
 
 
-
+  //init sensor filter algs by calculating process noise for each sensor
+  //calculate_sensor_process_noise();
 
   uint32_t last_tick = HAL_GetTick();
   /* USER CODE END 2 */
@@ -401,8 +405,23 @@ int main(void)
 //  	float dt = (now - last_tick	) / 1000.0f;
 //  	last_tick = now;
 //
-//  	//accelerometer
-//      lsm6dso_acceleration_raw_get(&lsm6dso_ctx, raw_accel);
+	  	//accelerometer
+	  	lsm6dso_acceleration_raw_get(&lsm6dso_ctx, raw_accel);
+	  	char rawAccel[100];
+	  	char filterAccel[100];
+	  	sprintf(rawAccel, "RawAccel: x: %i y: %i z: %i.", raw_accel[0], raw_accel[1], raw_accel[2]);
+	  	filter_sensor_data(raw_accel, ACCELEROMETER);
+	  	sprintf(filterAccel, "\tFilteredAccel: x: %i y: %i z: %i.\r\n", raw_accel[0], raw_accel[1], raw_accel[2]);
+
+	  	HAL_UART_Transmit(&huart1, (int8_t*) rawAccel, strlen(rawAccel), 100);
+	  	HAL_UART_Transmit(&huart1, (int8_t*) filterAccel, strlen(filterAccel), 100);
+
+	  	//print raw values for accelerometer
+	  	//snprintf(accel_data, sizeof(accel_data), "RawAccel: x: %i\ty: %i\tz: %i.", raw_accel[1], raw_accel[0], raw_accel[2]);
+	  	//filter raw data
+	  	//filter_sensor_data(raw_accel, Sensor_Type.ACCELEROMETER);
+	  	//print filtered values for accelerometer
+	  	//snprintf(accel_data, sizeof(accel_data), "\tFilteredAccel: x: %i\ty: %i\tz: %i.\r\n", raw_accel[1], raw_accel[0], raw_accel[2]);
 //
 //      accel_mss[0] = raw_accel_to_mss(raw_accel[0]);
 //      accel_mss[1] = raw_accel_to_mss(raw_accel[1]);
@@ -412,7 +431,22 @@ int main(void)
 //      HAL_UART_Transmit(&huart1, (uint8_t *)accel_data, strlen(accel_data), HAL_MAX_DELAY);
 //
 //      //gyro
-//      lsm6dso_angular_rate_raw_get(&lsm6dso_ctx, raw_gyro);
+	  	lsm6dso_angular_rate_raw_get(&lsm6dso_ctx, raw_gyro);
+	  	char rawGyro[100];
+	  	char filterGyro[100];
+	  	sprintf(rawGyro, "RawGyro: x: %i y: %i z: %i.", raw_gyro[0], raw_gyro[1], raw_gyro[2]);
+	  	filter_sensor_data(raw_gyro, GYROSCOPE);
+	  	sprintf(filterGyro, "\tFilteredGyro: x: %i y: %i z: %i.\r\n", raw_gyro[0], raw_gyro[1], raw_gyro[2]);
+
+	  	HAL_UART_Transmit(&huart1, (int8_t*) rawGyro, strlen(rawGyro), 100);
+	  	HAL_UART_Transmit(&huart1, (int8_t*) filterGyro, strlen(filterGyro), 100);
+
+	  	//snprintf(raw_gyro, sizeof(raw_gyro), "RawGyro: x: %i\ty: %i\tz: %i.", raw_gyro[0], raw_gyro[1], raw_gyro[2]);
+	  	//filter raw gyro data
+	  	//filter_sensor_data(raw_gyro, Sensor_Type.GYROSCOPE);
+	  	//print filtered gyro values
+	  	//snprintf(gyro_data, sizeof(gyro_data), "\tFilteredGyro: x: %i\ty: %i\tz: %i.\r\n", raw_gyro[0], raw_gyro[1], raw_gyro[2]);
+
 //
 //      gyro_intermediate[0]= raw_gyro_to_degreespersecond(raw_gyro[0]) -offset_x ;
 //      gyro_intermediate[1]= -raw_gyro_to_degreespersecond(raw_gyro[1]) - offset_y ;
@@ -428,10 +462,21 @@ int main(void)
 //
 //
 //     // loop for magnetometer data
-//      iis2mdc_magnetic_raw_get(&iis2mdc_ctx, raw_mag);
-//      sprintf(mag_data, "MAG DATA  X: %i Y: %i Z: %i \r\n", raw_mag[0], raw_mag[1], raw_mag[2]);
+        iis2mdc_magnetic_raw_get(&iis2mdc_ctx, raw_mag);
+	  	char rawMag[100];
+	  	char filterMag[100];
+	  	sprintf(rawMag, "RawMag: x: %i y: %i z: %i.", raw_mag[0], raw_mag[1], raw_mag[2]);
+	  	filter_sensor_data(raw_mag, MAGNETOMETER);
+	  	sprintf(filterMag, "\tFilteredMag: x: %i y: %i z: %i.\r\n", raw_mag[0], raw_mag[1], raw_mag[2]);
+
+	  	HAL_UART_Transmit(&huart1, (int8_t*) rawMag, strlen(rawMag), 100);
+	  	HAL_UART_Transmit(&huart1, (int8_t*) filterMag, strlen(filterMag), 100);
+
+        //sprintf(mag_data, "RawMag: x: %i\ty: %i\tz: %i.", raw_mag[0], raw_mag[1], raw_mag[2]);
+        //filter_sensor_data(raw_mag, Sensor_Type.MAGNETOMETER);
+        //sprintf(mag_data, "\tFilterMag: x: %i\ty: %i\tz: %i.\r\n", raw_mag[0], raw_mag[1], raw_mag[2]);
 //      HAL_UART_Transmit(&huart1, (uint8_t*)mag_data, strlen(mag_data), HAL_MAX_DELAY);
-//      HAL_Delay(10);
+	  	//HAL_Delay(1);
   }
   /* USER CODE END 3 */
 }
