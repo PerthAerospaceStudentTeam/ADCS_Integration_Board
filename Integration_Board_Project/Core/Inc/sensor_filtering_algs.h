@@ -10,20 +10,22 @@
 	#include <stdint.h>
 
 	/* Define enum used to indicate sensor, used in filtering function to apply correct fixed bias removal */
+	/* Passed alongside raw data into 'filter_sensor_data' to indicate which sensor that data to be filtered belongs to */
 	typedef enum {
 		ACCELEROMETER = 0,
 		GYROSCOPE,
 		MAGNETOMETER
 	} Sensor_Type;
 
-
-	/* Function declarations */
+	/*
+	* Function used to filter x, y, z data from a particular sensor
+	* Imports:
+	* 	-data (int16_t[3]): 1D Array of 3 ints representing data to be filtered
+	*		-IMPORTANT: data must be in format: new_raw_measurements_for_sensor[x, y, z]
+	* 	-data_source (Sensor_Type): used to apply and update correct state prediction variables based on sensor
+	* Values in 'data' are updated with estimated state for each sensor axis produced by filtering algorithms 
+	*/
 	void filter_sensor_data(int16_t data[3], Sensor_Type data_source);
-
-	/* Testing functions (these functions are temporarily available to other files to test independently) */
-	int16_t predict_system_state_test(int16_t data, double* k, int16_t* e, int16_t* s, int16_t p);
-	void kalman_state_estimation(int16_t data[3], Sensor_Type data_source);
-
 	#ifdef __cplusplus
 	}
 	#endif

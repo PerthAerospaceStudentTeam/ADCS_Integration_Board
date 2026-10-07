@@ -35,7 +35,7 @@ const static Fixed_Bias mag_fixed_bias = {PLACEHOLDER_BIAS, PLACEHOLDER_BIAS, PL
 
 /* define maximum number of raw measurements stored for each axis, larger values provide more 'consistent' lag speed (i.e. time taken to readjust to sudden change in average measurements) */
 /* Lower values have caused faster adjustments to increases in axis reading, but slower adjustments to decreases in axis readings */
-/* note: setting value to x requires ((x*16)*3) bits to be stored for each sensor being filtered */
+/* note: setting value to x requires ((x*16)*3) bits to be stored for each sensor being filtered, should also consider increased performance costs */
 /* Also: requires x initial measurements until retrieved filtered state can be completely 'trusted' (otherwise, x-num_curr_measurements 0 values are considered in raw measurment average) */
 #define RAW_MEASUREMENTS_SIZE 7
 
@@ -52,31 +52,35 @@ typedef struct {
 	int16_t mean; //average of all measurement values within the raw_measurements array
 } Axis_Measurements;
 
-/* various inline functions used to calculate attributes of Axis_Measurements when updating raw_measurements */
+/* various inline functions used to calculate attributes of Axis_Measurements when updating raw_measurements for a sensor axis */
+
+/* incremenent index (to insert a new measurement) when new measurement recieved */
 static inline void UPDATE_INDEX(int16_t* index) {
 	(*index) = (*index) + 1;
 	if ((*index) % RAW_MEASUREMENTS_SIZE == 0) { *(index) = 0; }
 }
 
+/* calulcate the average value of all raw measurements stored for a particular sensor axis */
 static inline void CALCULATE_MEAN(Axis_Measurements* axis_measurements) {
-	uint16_t i; int64_t mean = 0; //upcast sum of measurements to avoid overflow
+	uint16_t i; int64_t mean = 0; //upcast sum of measurements to avoid overflow during calculation
 	for (i = 0; i < RAW_MEASUREMENTS_SIZE; i++) { mean += (axis_measurements->raw_measurements)[i]; }
 	axis_measurements->mean = (int16_t) mean / RAW_MEASUREMENTS_SIZE;
 }
 
+/* calculate the average variation in raw measurements from the average raw measurement for a sensor */
 #define SQUARE(x) ((x)*(x))
 static inline void CALCULATE_RAW_VARIANCE(Axis_Measurements* axis_measurements) {
-	uint16_t i; int64_t sum_of_squared_differences = 0; //upcast to avoid overflow
+	uint16_t i; int64_t sum_of_squared_differences = 0; //upcast to avoid overflow during calculation
 	for (i = 0; i < RAW_MEASUREMENTS_SIZE; i++) { sum_of_squared_differences += (int64_t)SQUARE(axis_measurements->raw_measurements[i] - axis_measurements->mean); }
 	axis_measurements->raw_variation = (int32_t) ( sum_of_squared_differences / (RAW_MEASUREMENTS_SIZE) );
 }
 
 /*
-* Function to add new measurement into a Axis_Measurements struct
-* Must recalculate min, max, avg differnce and avg measurement value as well as ensure measurement added to correct index (within raw_measurements array)
+* Function to add new measurement into a Axis_Measurements struct, i.e. add new raw measurement to be tracked for a sensor axis
+* Must recalculate avg difference and avg measurement value as well as ensure measurement added to correct index (within raw_measurements array)
 * Imports:
 *	-new_measurement (int16_t): new raw measurement to be stored
-*	-axis_measurements (Axis_Measurements*): pointer to axis_measurements struct to update
+*	-axis_measurements (Axis_Measurements*): address of axis_measurements struct to update
 */
 static void add_new_raw_measurement(int16_t new_measurement, Axis_Measurements* axis_measurements) {
 	/* insert new measurement into array at next index, update index */
@@ -88,7 +92,8 @@ static void add_new_raw_measurement(int16_t new_measurement, Axis_Measurements* 
 	CALCULATE_RAW_VARIANCE(axis_measurements);
 }
 
-/* Struct used to maintain variables required for state prediction algorithm */
+/* Struct used to maintain variables required for kalman state prediction algorithm */
+/* Maintains current predicted state, current kalman gain, current estimation variation (corvariance) and raw measurements for the axis */
 typedef struct {
 	Axis_Measurements raw_measurements;
 	double kalman_gain;
@@ -97,14 +102,14 @@ typedef struct {
 } State_Prediction_Variables;
 
 /* Struct used to store variables required to filter each reading from IMU && MAG */
+/* Must maintain state prediction variables for each sensor axis */
 typedef struct {
 	State_Prediction_Variables x;
 	State_Prediction_Variables y;
 	State_Prediction_Variables z;
-	int16_t sensor_process_noise;
 } Sensor_Reading_Filtering;
 
-/* Store variables required to complete state prediction filtering algorithms for each sensor measurement */
+/* vars used to maintain sensor filering information for each individual sensor */
 static Sensor_Reading_Filtering accel_filtered_state;
 static Sensor_Reading_Filtering gyro_filtered_state;
 static Sensor_Reading_Filtering mag_filtered_state;
@@ -117,7 +122,11 @@ static Sensor_Reading_Filtering mag_filtered_state;
 * Updates imported data to filtered version of data
 */
 static inline void filter_fixed_bias(int16_t data[3], Sensor_Type data_source) {
-	/* apply bias removal based on source of raw data */
+	/* As fixed-bias structs have all values=0, this function has no purpose */
+	/* simply a atrifact of previous implementation of sensor_filtering_algs which also provided fixed bias removal */
+	/* Unsure if fixed bias removal is to be implemented per axis or during sensor fusion. If per-axis, this implementation may simply be uncommented */
+
+	/* apply bias removal based on source of raw data
 	switch(data_source) {
 		case ACCELEROMETER:
 			data[0] -= accel_fixed_bias.x; 
@@ -135,18 +144,19 @@ static inline void filter_fixed_bias(int16_t data[3], Sensor_Type data_source) {
 			data[0] -= mag_fixed_bias.z; 
 			break;
 	}
+	*/
 }
 
 /*
 * Following set of functions aims to implement the 3 algorithms used in state prediction Kalman filtering algorithm
-* Heavily based on algorithms found at: https://kalmanfilter.net/kalman1d.html
+* Heavily based on algorithms found at: https://kalmanfilter.net/kalman1d.html, with modified calculation to determine measurement variance
 */
 
 /*
 * Algorithm to calculate the Kalman gain, (determines the 'strength' given to new measurements)
 * imports: 
 * 	-p (int16_t):  representing extrapolated variance estimation
-* 	-r (int16_t): representing variance in current measurement
+* 	-r (int16_t): representing average variation in raw measurements, incl. new raw measurement, for axis
 * exports: new value of kalman gain (K), 0.0 <= K <= 1.0
  */
 static inline double calculate_kalman_gain(int16_t p, int16_t r) {
@@ -185,7 +195,8 @@ static inline int16_t calculate_state_estimation(int16_t x, double k, int16_t z)
 * 	-state_predict_vars (State_Prediction_Variables*): reference to struct containing appropriate variables to apply state prediction
 * 	-process_noise (int16_t): process noise of sensor
 * Updates values stored within state_predict_vars to reflect new state prediction variables (state_predict_vars->state_estimation is filtered data)
-* Exports: value of state_predict_vars->state_estimation after prediction occurs
+* Exports: 
+*	-value of state_predict_vars->state_estimation after prediction occurs
 */
 static inline int16_t predict_system_state(int16_t data, State_Prediction_Variables* state_predict_vars, int16_t process_noise) {
 	int16_t measurement_variance;
@@ -206,25 +217,28 @@ static inline int16_t predict_system_state(int16_t data, State_Prediction_Variab
 /*
 * Function to apply kalman state estimation filtering for x, y, z readings from sensor
 * imports:
-* 	-data (int16_t[3]): 1D Array of 3 ints representing data to be filtered
+* 	-data (int16_t[3]): 1D Array of 3 ints representing data to be filtered, [x, y, z]
 * 	-data_source (Sensor_Type): used to apply and update correct state prediction variables
 * updates each value in imported array to reflect predicted state for that value after kalman state estimation function applied
 */
 void kalman_state_estimation(int16_t data[3], Sensor_Type data_source) {
-
-	//filter data using appropriate state-estimation variables determined on source of data
+	/* filters per axis for defined sensor_type using filtering alg variables associated with each sensor axis */
 	switch(data_source) {
 		case ACCELEROMETER:
+			/* filter accelerometer data */
 			data[0] = predict_system_state(data[0], &(accel_filtered_state.x), PROCESS_NOISE); // x
 			data[1] = predict_system_state(data[1], &(accel_filtered_state.y), PROCESS_NOISE); // y
 			data[2] = predict_system_state(data[2], &(accel_filtered_state.z), PROCESS_NOISE); // z
 			break;
 		case GYROSCOPE:
+			/* filter gyroscope data */
 			data[0] = predict_system_state(data[0], &(gyro_filtered_state.x), PROCESS_NOISE); // x
 			data[1] = predict_system_state(data[1], &(gyro_filtered_state.y), PROCESS_NOISE); // y
 			data[2] = predict_system_state(data[2], &(gyro_filtered_state.z), PROCESS_NOISE); // z
 			break;
 		case MAGNETOMETER:
+			/* filter magnetometer data */
+			/* Additionally, as the magnetometer has slower data output rate, sensor filtering algs may cause slower responses to sudden changes */
 			data[0] = predict_system_state(data[0], &(mag_filtered_state.x), PROCESS_NOISE); // x
 			data[1] = predict_system_state(data[1], &(mag_filtered_state.y), PROCESS_NOISE); // y
 			data[2] = predict_system_state(data[2], &(mag_filtered_state.z), PROCESS_NOISE); // z
@@ -234,14 +248,16 @@ void kalman_state_estimation(int16_t data[3], Sensor_Type data_source) {
 
 /*
 * Function used to filter x, y, z data from a particular sensor
-* ASSUMES: process noise has been calculated for each sensor (i.e. invoked calculate_sensor_process_noise() before calling this function)
 * Imports:
 * 	-data (int16_t[3]): 1D Array of 3 ints representing data to be filtered
-* 	-data_source (Sensor_Type): used to apply and update correct state prediction variables
-* Updates imported data so that values stored in array represent new, filtered data after fixed bias and instability/stability biases are removed
+*		-IMPORTANT: data must be in format: new_raw_measurements_for_sensor[x, y, z]
+* 	-data_source (Sensor_Type): used to apply and update correct state prediction variables based on sensor
+* Values in 'data' are updated with estimated state for each sensor axis produced by filtering algorithms 
 */
 void filter_sensor_data(int16_t data[3], Sensor_Type data_source) {
-	//First filter fixed biases from readings, then apply kalman filtering for instability/stability random biases
-	filter_fixed_bias(data, data_source);
+	//current implementation not to remove fixed bias, fixed bias removal to be determined during creation of sensor fusion filtering
+	//filter_fixed_bias(data, data_source);
+
+	//apply kalman filtering for instability/stability random biases
 	kalman_state_estimation(data, data_source);
 }
