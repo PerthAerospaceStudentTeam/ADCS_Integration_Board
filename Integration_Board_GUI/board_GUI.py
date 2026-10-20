@@ -6,7 +6,7 @@ import time
 import pyqtgraph as pg
 from pyqtgraph.Qt import QtCore
 
-# ------------------------------- GUI Components -------------------------------
+# ------------------------------- GUI Components -------------------------------#
 PLOT_VALUES = 500  # Number of values to store and plot
 
 # Create the main GUI app and widget for plotting basic sensor data
@@ -59,9 +59,10 @@ data_dict = {"ACC": np.zeros((4, PLOT_VALUES)),
              "SUN": np.zeros((7, PLOT_VALUES))}
 
 
-# ---------------------------- GUI Update Function -----------------------------
+# ---------------------------- GUI Update Function -----------------------------#
 def update():
-    """Update the GUI plots with new sensor data read from a serial port.
+    """
+    Update the GUI plots with new sensor data read from a serial port.
 
     The `update()` function is connected to the QTimer `timer` created below and
     is called everytime `timer` generates a `timeout()` signal.
@@ -74,7 +75,7 @@ def update():
         serial_data = board_serial.read(board_serial.in_waiting)
         serial_buffer.extend(serial_data)
 
-        # Only read complete lines (terminating with '\n') from the serial buffer
+        # Only read complete lines (assumed they end with '\n') from the serial buffer
         while b'\n' in serial_buffer:
             update_start = time.perf_counter()
 
@@ -103,17 +104,15 @@ def update():
                         plot_arr[i].setData(x=data_arr[0], y=data_arr[i + 1])  # Plots the new sensor data
 
                     print(f"|DEBUG| bytes waiting: {board_serial.in_waiting}")
-                    print(f"|DEBUG| raw_data: {serial_data}")
-                    print(f"|DEBUG| serial_data: {serial_data}", end="")
-                    print(f"|DEBUG| new_data: {new_data}")
 
             update_end = time.perf_counter()
             print(f"|DEBUG| Update took {(update_end - update_start) * 1000} ms\n")
+
     except Exception as e:
-        print(f"|DEBUG| {e}")
+        print(f"|EXCEPTION| {e}")
 
 
-# -------------------------------- GUI Program ---------------------------------
+# -------------------------------- GUI Program ---------------------------------#
 # Search through available serial ports for the ADCS Integration Board device
 ports = serial.tools.list_ports.comports()
 for p in ports:
